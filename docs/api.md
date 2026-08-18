@@ -18,7 +18,18 @@ application/json
 ## 2. Customers
 ### GET /customers
 
-Returns a list of customers.
+Returns a paginated list of customers.
+
+Optional query parameters:
+```text
+page
+pageSize
+```
+
+Example:
+```http
+GET /api/customers?page=1&pageSize=20
+```
 
 **Response**
 ```http
@@ -26,14 +37,20 @@ Returns a list of customers.
 ```
 
 ```json
-[
-  {
-    "id": 1,
-    "name": "John Smith",
-    "email": "john.smith@example.com",
-    "isActive": true
-  }
-]
+{
+  "pageNumber": 1,
+  "pageSize": 20,
+  "totalCount": 42,
+  "totalPages": 3,
+  "items": [
+    {
+      "id": 1,
+      "name": "John Smith",
+      "email": "john.smith@example.com",
+      "isActive": true
+    }
+  ]
+}
 ```
 
 ### GET /customers/{id}
@@ -91,10 +108,48 @@ Creates a customer.
 }
 ```
 
+**Error Responses**
+
+Duplicate email (409 Conflict):
+```json
+{
+  "code": "DUPLICATE_EMAIL",
+  "message": "Email address already exists"
+}
+```
+
+Invalid email format (422 Unprocessable Entity):
+```json
+{
+  "code": "INVALID_EMAIL",
+  "message": "The request contains validation errors",
+  "errors": [
+    {
+      "field": "email",
+      "message": "Email address must be in valid format"
+    }
+  ]
+}
+```
+
+Missing required field (400 Bad Request):
+```json
+{
+  "code": "MISSING_REQUIRED_FIELD",
+  "message": "The request contains validation errors",
+  "errors": [
+    {
+      "field": "name",
+      "message": "Name is required"
+    }
+  ]
+}
+```
+
 ## 3. Products
 ### GET /products
 
-Returns a list of products.
+Returns a paginated list of products.
 
 Optional query parameters:
 ```text
@@ -105,6 +160,29 @@ pageSize
 Example:
 ```http
 GET /api/products?page=1&pageSize=20
+```
+
+**Response**
+```http
+200 OK
+```
+
+```json
+{
+  "pageNumber": 1,
+  "pageSize": 20,
+  "totalCount": 150,
+  "totalPages": 8,
+  "items": [
+    {
+      "id": 10,
+      "sku": "PROD-001",
+      "name": "Example Product",
+      "unitPrice": 49.99,
+      "isActive": true
+    }
+  ]
+}
 ```
 
 ### GET /products/{id}
@@ -153,7 +231,7 @@ Creates a product.
 ## 4. Orders
 ### GET /orders
 
-Returns a list of orders.
+Returns a paginated list of orders.
 
 Optional query parameters:
 ```text
@@ -166,6 +244,29 @@ pageSize
 Example:
 ```http
 GET /api/orders?status=Pending&page=1&pageSize=20
+```
+
+**Response**
+```http
+200 OK
+```
+
+```json
+{
+  "pageNumber": 1,
+  "pageSize": 20,
+  "totalCount": 95,
+  "totalPages": 5,
+  "items": [
+    {
+      "id": 100,
+      "customerId": 1,
+      "orderDate": "2026-01-15T10:30:00Z",
+      "status": "Pending",
+      "totalAmount": 149.97
+    }
+  ]
+}
 ```
 ### GET /orders/{id}
 
@@ -211,18 +312,24 @@ Creates an order.
 }
 ```
 
+**Validation**
+* CustomerId is required.
+* Items array is required and must contain at least one item.
+* Each item must specify productId and quantity.
+* Quantity must be greater than zero.
+* Customer must exist and be active.
+* All products must exist and be active.
+
 **Processing rules**
 
 The application must:
 
-1. Validate the customer.
-1. Ensure the customer is active.
-1. Validate all products.
-1. Ensure all products are active.
+1. Validate the customer exists and is active.
+1. Validate all products exist and are active.
 1. Retrieve current product prices.
 1. Calculate item subtotals.
 1. Calculate the order total.
-1. Create the order.
+1. Create the order with status = Pending.
 1. Persist the order and items atomically.
 
 **Response**
@@ -234,6 +341,7 @@ The application must:
 {
   "id": 100,
   "customerId": 1,
+  "orderDate": "2026-01-15T10:30:00Z",
   "status": "Pending",
   "totalAmount": 149.97,
   "items": [
@@ -242,6 +350,54 @@ The application must:
       "quantity": 3,
       "unitPrice": 49.99,
       "subtotal": 149.97
+    }
+  ]
+}
+```
+
+**Error Responses**
+
+Customer not found (404 Not Found):
+```json
+{
+  "code": "CUSTOMER_NOT_FOUND",
+  "message": "Customer with ID 999 does not exist"
+}
+```
+
+Customer inactive (409 Conflict):
+```json
+{
+  "code": "CUSTOMER_INACTIVE",
+  "message": "Cannot create order for inactive customer"
+}
+```
+
+Product not found (404 Not Found):
+```json
+{
+  "code": "PRODUCT_NOT_FOUND",
+  "message": "Product with ID 999 does not exist"
+}
+```
+
+Product inactive (409 Conflict):
+```json
+{
+  "code": "PRODUCT_INACTIVE",
+  "message": "Cannot add inactive product to order"
+}
+```
+
+Invalid quantity (422 Unprocessable Entity):
+```json
+{
+  "code": "INVALID_QUANTITY",
+  "message": "The request contains validation errors",
+  "errors": [
+    {
+      "field": "items[0].quantity",
+      "message": "Quantity must be greater than zero"
     }
   ]
 }
@@ -259,25 +415,53 @@ Changes the status of an order.
 ```
 
 **Valid transitions**
+
+See [ADR-006: Order Status Transitions](../adr/ADR-006-order-status-transitions.md) for complete transition rules.
+
 ```text
-Pending → Confirmed
-Pending → Cancelled
-Confirmed → Completed
+Pending → Confirmed (Customer confirms order)
+Pending → Cancelled  (Customer cancels before confirmation)
+Confirmed → Completed (Order fulfilled)
 ```
 
-**Invalid transition**
-
-If the requested transition is not allowed:
-
+**Response**
 ```http
-409 Conflict
+200 OK
 ```
 
-Example:
 ```json
 {
-  "title": "Invalid order status transition",
-  "detail": "An order in Completed status cannot be changed to Cancelled."
+  "id": 100,
+  "customerId": 1,
+  "orderDate": "2026-01-15T10:30:00Z",
+  "status": "Confirmed",
+  "totalAmount": 149.97,
+  "items": [
+    {
+      "productId": 10,
+      "quantity": 3,
+      "unitPrice": 49.99,
+      "subtotal": 149.97
+    }
+  ]
+}
+```
+
+**Error Responses**
+
+Order not found (404 Not Found):
+```json
+{
+  "code": "ORDER_NOT_FOUND",
+  "message": "Order with ID 999 does not exist"
+}
+```
+
+Invalid status transition (409 Conflict):
+```json
+{
+  "code": "INVALID_STATUS_TRANSITION",
+  "message": "An order in Completed status cannot be changed to Cancelled"
 }
 ```
 ## 5. HTTP Status Codes

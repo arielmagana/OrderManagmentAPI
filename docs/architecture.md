@@ -20,6 +20,18 @@ The primary goals are:
 
 The application is intentionally limited in scope. Authentication, authorization, payment processing, inventory management, and asynchronous messaging are outside the current scope.
 
+### Key Decision References
+
+See the Architecture Decision Records (ADRs) for detailed rationale on major architectural choices:
+- [ADR-001: Clean Architecture](./adr/ADR-001-clean-architecture.md)
+- [ADR-002: Modular Monolith](./adr/ADR-002-modular-monolith..md)
+- [ADR-003: Entity Framework Core with SQL Server](./adr/ADR-003-ef-core.md)
+- [ADR-004: Azure App Service and SQL Database](./adr/ADR-004-azure-hosting.md)
+- [ADR-005: ASP.NET Core Controllers](./adr/ADR-005-use-aspnet-controllers.md)
+- [ADR-006: Order Status Transitions](./adr/ADR-006-order-status-transitions.md)
+- [ADR-007: Error Handling and HTTP Status Codes](./adr/ADR-007-error-handling.md)
+- [ADR-008: Framework and Infrastructure Technology Choices](./adr/ADR-008-framework-choices.md)
+
 ## 2. Architecture Overview
 
 The solution follows Clean Architecture principles.
@@ -321,6 +333,8 @@ Examples:
 * Completed → Cancelled
 * Completed → Pending
 
+For complete order status transition rules, business logic, and API error handling, see [ADR-006: Order Status Transitions](./adr/ADR-006-order-status-transitions.md).
+
 ## 7. Order Creation Flow
 
 The order creation use case follows this sequence:
@@ -352,8 +366,6 @@ sequenceDiagram
 
 The operation must be atomic. If persistence fails, the complete order creation operation must be rolled back.
 
-The operation must be indempotent. If the same order is retried, it should return a success without duplication operation.
-
 ## 8. Persistence
 
 Entity Framework Core is used for data access.
@@ -371,7 +383,23 @@ Foreign key relationships enforce referential integrity.
 
 Money values must use a fixed-precision decimal type rather than floating-point types.
 
-## 9. API Design
+## 9. Framework and Infrastructure Technology Choices
+
+Detailed technology choices for the implementation layers are documented in [ADR-008: Framework and Infrastructure Technology Choices](./adr/ADR-008-framework-choices.md).
+
+**Summary of choices:**
+
+| Concern | Choice | Rationale |
+|---------|--------|-----------|
+| Validation | Data Annotations + FluentValidation | Enterprise standard, flexible |
+| DTO Mapping | Manual mapping in Application layer | Explicit, demonstrates clean separation |
+| Logging | Microsoft.Extensions.Logging | Built-in, no external dependency |
+| Configuration | Microsoft.Extensions.Configuration | Standard .NET approach |
+| Health Checks | .NET Health Checks + Aspire integration | Built-in, cloud-ready |
+
+These choices balance enterprise practices with demonstration scope and educational value.
+
+## 10. API Design
 
 The API follows REST principles.
 
@@ -379,9 +407,9 @@ The decision to use Controllers instead of Minimal APIs is documented in [ADR-00
 
 Resources:
 ```text
-/customers
-/products
-/orders
+/api/customers
+/api/products
+/api/orders
 ```
 
 The API uses JSON for requests and responses.
@@ -390,22 +418,12 @@ OpenAPI documentation is provided through the ASP.NET Core API documentation too
 
 Detailed endpoint definitions are documented in [api.md](./api.md).
 
-## 10. Error Handling
+### Error Handling
 
-The API provides consistent error responses.
-
-Expected categories include:
-
-* Validation errors
-* Resource not found
-* Business rule violations
-* Unexpected server errors
-
-The API should not expose internal exception details to clients.
-
-Errors should contain enough information for the client to understand the problem without exposing sensitive implementation details.
-
-Detail information should be saved in logs for root cause analisis.
+Refer to [ADR-007: Error Handling and HTTP Status Codes](./adr/ADR-007-error-handling.md) for:
+- Standardized error response format
+- HTTP status code mapping to business scenarios
+- Error codes and examples
 
 ## 11. Observability
 
@@ -413,7 +431,23 @@ The application uses the standard .NET logging and telemetry capabilities provid
 
 Local development and service orchestration are supported through .NET Aspire.
 
-The initial implementation does not introduce a dedicated distributed tracing or external observability platform.
+### Logging
+
+Logging is implemented using `Microsoft.Extensions.Logging` (the built-in .NET logging framework).
+
+See [ADR-008: Framework and Infrastructure Technology Choices](./adr/ADR-008-framework-choices.md) for logging implementation details.
+
+Logs are structured and can be consumed by various providers (console, file, cloud).
+
+### Health Checks
+
+The application exposes a health check endpoint at `/api/health`.
+
+See [deployment.md](./deployment.md#11-health-check) for health check details and Aspire integration.
+
+### Production Observability
+
+The initial implementation does not introduce a dedicated distributed tracing or external observability platform (e.g., Application Insights).
 
 This can be added if required by a future production scenario.
 

@@ -147,19 +147,68 @@ The deployment process is:
 1. Database migrations are applied using the defined deployment strategy.
 1. Application health is verified.
 
-11. Health Check
+## 11. Health Check
 
-The application exposes a health endpoint:
+The application exposes a health check endpoint at:
 ```http
-GET /health
+GET /api/health
 ```
 
-Expected response:
+Expected response when healthy:
 ```http
 200 OK
 ```
 
-The health check verifies application availability and relevant dependencies.
+```json
+{
+  "status": "Healthy",
+  "checks": {
+    "Database": {
+      "status": "Healthy"
+    }
+  }
+}
+```
+
+### Health Check Implementation
+
+The health check endpoint is implemented using .NET's built-in `HealthChecks` middleware.
+
+Configuration:
+- The `Microsoft.Extensions.Diagnostics.HealthChecks` package provides the health check infrastructure
+- .NET Aspire includes built-in health checks for SQL Server connectivity
+- The AppHost (AppHost.cs) configures health checks for the API service and SQL Server resource
+
+### Checked Dependencies
+
+The health check verifies:
+- **Database connectivity**: Whether the SQL Server database is reachable and responsive
+- **Application startup**: Whether the application has completed startup successfully
+
+### Local Development with Aspire
+
+.NET Aspire automatically provides health checks for:
+- The Order Management API
+- SQL Server resource
+- Resource orchestration status
+
+Health status is visible in the Aspire dashboard at `http://localhost:15000` (or similar port).
+
+### Production Deployment
+
+In Azure App Service:
+- The health endpoint is used by Azure load balancers to verify application health
+- Azure monitors the `/api/health` endpoint to determine if the instance should receive traffic
+- Failed health checks trigger automated recovery actions (restart, replacement)
+
+### Extensibility
+
+Additional health checks can be added in the future:
+- External API dependencies (payment processors, shipping providers)
+- Cache health (if Redis is introduced)
+- File storage health (if blob storage is added)
+
+Currently, only database connectivity is checked to keep the scope aligned with the project goals.
 
 # 12. Rollback
 
