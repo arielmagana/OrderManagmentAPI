@@ -36,6 +36,12 @@ public class Product
     public string Sku { get; set; } = string.Empty;
 
     /// <summary>
+    /// Whether the product is active (can be added to orders).
+    /// Inactive products cannot be used to create new orders.
+    /// </summary>
+    public bool IsActive { get; set; } = true;
+
+    /// <summary>
     /// Timestamp when the product record was created.
     /// </summary>
     public DateTime CreatedAt { get; set; }

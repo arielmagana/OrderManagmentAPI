@@ -1,12 +1,13 @@
-namespace OrderManagement.Domain.Entities;
+namespace OrderManagement.Application.Customers.DTOs;
 
 /// <summary>
-/// Represents a customer in the order management system.
+/// Response DTO for customer queries.
+/// Per api.md specification.
 /// </summary>
-public class Customer
+public class CustomerDto
 {
     /// <summary>
-    /// Unique identifier for the customer.
+    /// The unique identifier of the customer.
     /// </summary>
     public int Id { get; set; }
 
@@ -46,10 +47,9 @@ public class Customer
     public string Country { get; set; } = string.Empty;
 
     /// <summary>
-    /// Whether the customer is active (can place orders).
-    /// Inactive customers cannot be used to create new orders.
+    /// Whether the customer is active (can be used in orders).
     /// </summary>
-    public bool IsActive { get; set; } = true;
+    public bool IsActive { get; set; }
 
     /// <summary>
     /// Timestamp when the customer record was created.
@@ -60,9 +60,4 @@ public class Customer
     /// Timestamp when the customer record was last updated.
     /// </summary>
     public DateTime UpdatedAt { get; set; }
-
-    /// <summary>
-    /// Navigation property for orders placed by this customer.
-    /// </summary>
-    public ICollection<Order> Orders { get; set; } = new List<Order>();
 }
