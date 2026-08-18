@@ -209,17 +209,25 @@ erDiagram
         int Id PK
         string Name
         string Email
+        string Phone
+        string Address
+        string City
+        string PostalCode
+        string Country
         bool IsActive
         datetime CreatedAt
+        datetime UpdatedAt
     }
 
     ORDER {
         int Id PK
+        string OrderNumber UK
         int CustomerId FK
-        datetime OrderDate
         string Status
         decimal TotalAmount
+        string Notes
         datetime CreatedAt
+        datetime UpdatedAt
     }
 
     ORDER_ITEM {
@@ -228,16 +236,18 @@ erDiagram
         int ProductId FK
         int Quantity
         decimal UnitPrice
-        decimal Subtotal
+        decimal LineTotal
     }
 
     PRODUCT {
         int Id PK
         string Sku
         string Name
-        decimal UnitPrice
+        decimal Price
+        int StockQuantity
         bool IsActive
         datetime CreatedAt
+        datetime UpdatedAt
     }
 ```
 
