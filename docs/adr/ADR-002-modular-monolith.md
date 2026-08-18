@@ -26,6 +26,8 @@ The initial domain areas are:
 
 The architecture should allow individual capabilities to be extracted into separate services in the future if business or technical requirements justify it.
 
+The project is a modular monolith in deployment style and feature organization, not a fully isolated module-per-assembly architecture. Customers, Products, and Orders are organized as feature areas within the shared Clean Architecture layers.
+
 ## Consequences
 
 ### Positive

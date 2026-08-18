@@ -24,7 +24,7 @@ The application is intentionally limited in scope. Authentication, authorization
 
 See the Architecture Decision Records (ADRs) for detailed rationale on major architectural choices:
 - [ADR-001: Clean Architecture](./adr/ADR-001-clean-architecture.md)
-- [ADR-002: Modular Monolith](./adr/ADR-002-modular-monolith..md)
+- [ADR-002: Modular Monolith](./adr/ADR-002-modular-monolith.md)
 - [ADR-003: Entity Framework Core with SQL Server](./adr/ADR-003-ef-core.md)
 - [ADR-004: Azure App Service and SQL Database](./adr/ADR-004-azure-hosting.md)
 - [ADR-005: ASP.NET Core Controllers](./adr/ADR-005-use-aspnet-controllers.md)

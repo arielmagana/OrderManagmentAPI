@@ -60,6 +60,8 @@ Examples:
 - Product unit price is not greater than zero
 - Order quantity is negative
 
+Use `400` when the request cannot be parsed or required structure is missing. Use `422` when the request is structurally valid but field values fail validation.
+
 #### 500 Internal Server Error
 Used when an unexpected server error occurs.
 
@@ -71,14 +73,16 @@ All error responses will use the following standardized JSON format:
 
 ```json
 {
+  "type": "https://example.com/problems/invalid-email",
+  "title": "Validation failed",
+  "status": 422,
+  "detail": "Human-readable error message",
   "code": "ERROR_CODE",
-  "message": "Human-readable error message",
-  "errors": [
-    {
-      "field": "fieldName",
-      "message": "Field-specific error message"
-    }
-  ]
+  "errors": {
+    "field": [
+      "Field-specific error message."
+    ]
+  }
 }
 ```
 
@@ -117,47 +121,64 @@ All error responses will use the following standardized JSON format:
 #### Validation Error (400/422)
 ```json
 {
+  "type": "https://example.com/problems/invalid-email",
+  "title": "Invalid Email",
+  "status": 422,
+  "detail": "The request contains validation errors",
   "code": "INVALID_EMAIL",
-  "message": "The request contains validation errors",
-  "errors": [
-    {
-      "field": "email",
-      "message": "Email address must be in valid format"
-    }
-  ]
+  "errors": {
+    "email": [
+      "Email address must be in valid format."
+    ]
+  }
 }
 ```
 
 #### Duplicate Resource (409)
 ```json
 {
+  "type": "https://example.com/problems/duplicate-email",
+  "title": "Duplicate email",
+  "status": 409,
+  "detail": "Email address already exists",
   "code": "DUPLICATE_EMAIL",
-  "message": "Email address already exists",
-  "errors": []
+  "errors": null
 }
 ```
 
 #### Invalid Status Transition (409)
 ```json
 {
+  "type": "https://example.com/problems/invalid-transition",
+  "title": "Invalid Status Transition",
+  "status": 409,
+  "detail": "An order in Completed status cannot be changed to Cancelled",
   "code": "INVALID_STATUS_TRANSITION",
-  "message": "An order in Completed status cannot be changed to Cancelled"
+  "errors": null
 }
 ```
 
 #### Not Found (404)
 ```json
 {
+  "type": "https://example.com/problems/not-found",
+  "title": "Customer not found",
+  "status": 404,
+  "detail": "Customer with ID 999 does not exist",
   "code": "CUSTOMER_NOT_FOUND",
-  "message": "Customer with ID 999 does not exist"
+  "errors": null
 }
 ```
 
 #### Server Error (500)
 ```json
 {
+  "type": "https://example.com/problems/internal-error",
+  "title": "Internal Error",
+  "status": 5005
+  "detail": "An unexpected error occurred. Please contact support if the problem persists.",
   "code": "INTERNAL_ERROR",
-  "message": "An unexpected error occurred. Please contact support if the problem persists."
+  "errors": null
 }
 ```
 

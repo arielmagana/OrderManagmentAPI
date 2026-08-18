@@ -14,6 +14,7 @@ Content type:
 ```text
 application/json
 ```
+All endpoint paths below are relative to /api
 
 ## 2. Customers
 ### GET /customers
@@ -416,7 +417,7 @@ Changes the status of an order.
 
 **Valid transitions**
 
-See [ADR-006: Order Status Transitions](../adr/ADR-006-order-status-transitions.md) for complete transition rules.
+See [ADR-006: Order Status Transitions](./adr/ADR-006-order-status-transitions.md) for complete transition rules.
 
 ```text
 Pending → Confirmed (Customer confirms order)
@@ -475,6 +476,7 @@ The API uses the following status codes:
 | 400    | Invalid request         |
 | 404    | Resource not found      |
 | 409    | Business rule/conflict  |
+| 422    | Field-level validation failure |
 | 500    | Unexpected server error |
 
 ## 6. Error Response

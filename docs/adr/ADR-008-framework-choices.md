@@ -36,7 +36,7 @@ The following frameworks and approaches will be used:
 - FluentValidation provides powerful, readable validation rules for complex business logic
 - Clear separation: DTOs for simple constraints, Application validators for business rules
 - Pragmatic approach for demonstration project scope
-- No external dependency overhead while maintaining clean architecture
+- FluentValidation adds one small external dependency, but the tradeoff is acceptable because it keeps validation rules expressive and testable.
 
 ### 2. DTO Mapping
 
@@ -85,8 +85,8 @@ The following frameworks and approaches will be used:
 - Configuration sources in order of precedence:
   1. Command-line arguments (highest priority)
   2. Environment variables
-  3. `appsettings.json` (shared settings)
-  4. `appsettings.{Environment}.json` (environment-specific settings)
+  3. `appsettings.{Environment}.json` (environment-specific settings)
+  4. `appsettings.json` (shared settings)
 - Connection strings and secrets use environment-specific configuration
 - Local development uses .NET User Secrets for sensitive data
 - Cloud deployments use Azure App Service configuration
@@ -114,7 +114,7 @@ The following frameworks and approaches will be used:
 **Why this choice:**
 - Built into ASP.NET Core
 - Standard pattern for cloud deployments
-- Supports liveness and readiness probes for container orchestration
+- Supports readiness that includes SQL Server
 - Aspire integration simplifies local development
 - No external dependency
 
