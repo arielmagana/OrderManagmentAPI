@@ -3,6 +3,9 @@ namespace OrderManagement.Application.Products;
 using DTOs;
 using Commands;
 using Queries;
+using Validators;
+using Common.Validation;
+using FluentValidation;
 
 /// <summary>
 /// Service interface for product operations.
@@ -42,21 +45,28 @@ public class ProductService : IProductService
     private readonly UpdateProductCommandHandler _updateCommandHandler;
     private readonly GetProductQueryHandler _getQueryHandler;
     private readonly GetProductsPagedQueryHandler _getPagedQueryHandler;
+    private readonly IValidator<CreateProductRequest> _createValidator;
+    private readonly IValidator<UpdateProductRequest> _updateValidator;
 
     public ProductService(
         CreateProductCommandHandler createCommandHandler,
         UpdateProductCommandHandler updateCommandHandler,
         GetProductQueryHandler getQueryHandler,
-        GetProductsPagedQueryHandler getPagedQueryHandler)
+        GetProductsPagedQueryHandler getPagedQueryHandler,
+        IValidator<CreateProductRequest> createValidator,
+        IValidator<UpdateProductRequest> updateValidator)
     {
         _createCommandHandler = createCommandHandler;
         _updateCommandHandler = updateCommandHandler;
         _getQueryHandler = getQueryHandler;
         _getPagedQueryHandler = getPagedQueryHandler;
+        _createValidator = createValidator;
+        _updateValidator = updateValidator;
     }
 
     public async Task<ProductDto> CreateProductAsync(CreateProductRequest request)
     {
+        await RequestValidator.ValidateAsync(_createValidator, request);
         var command = new CreateProductCommand(request);
         return await _createCommandHandler.HandleAsync(command);
     }
@@ -69,12 +79,14 @@ public class ProductService : IProductService
 
     public async Task<Common.Pagination.PaginatedResponse<ProductDto>> GetProductsPagedAsync(int page = 1, int pageSize = 20)
     {
+        RequestValidator.ValidatePagination(page, pageSize);
         var query = new GetProductsPagedQuery(page, pageSize);
         return await _getPagedQueryHandler.HandleAsync(query);
     }
 
     public async Task<ProductDto> UpdateProductAsync(int productId, UpdateProductRequest request)
     {
+        await RequestValidator.ValidateAsync(_updateValidator, request);
         var command = new UpdateProductCommand(productId, request);
         return await _updateCommandHandler.HandleAsync(command);
     }

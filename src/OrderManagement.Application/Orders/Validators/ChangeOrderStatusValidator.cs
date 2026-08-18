@@ -13,11 +13,11 @@ public class ChangeOrderStatusValidator : AbstractValidator<ChangeOrderStatusReq
 {
     public ChangeOrderStatusValidator()
     {
-        RuleFor(x => x.NewStatus)
+        RuleFor(x => x.Status)
             .NotEmpty()
-            .WithMessage("NewStatus is required")
+            .WithMessage("Status is required")
             .Must(IsValidOrderStatus)
-            .WithMessage("NewStatus must be one of: Pending, Confirmed, Completed, Cancelled");
+            .WithMessage("Status must be one of: Pending, Confirmed, Completed, Cancelled");
     }
 
     private static bool IsValidOrderStatus(string status)

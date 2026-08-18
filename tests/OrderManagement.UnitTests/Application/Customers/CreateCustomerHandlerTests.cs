@@ -104,30 +104,6 @@ public class CreateCustomerHandlerTests
             Times.Never);
     }
 
-    [Fact]
-    public async Task HandleAsync_WithoutEmail_ThrowsValidationException()
-    {
-        // Arrange
-        var request = new CreateCustomerRequest { Name = "John Doe", Email = "" };
-
-        var handler = new CreateCustomerCommandHandler(_mockCustomerRepo.Object);
-
-        // Act & Assert - ValidationException is caught at API layer, so we test handler directly
-        // In this case, the handler doesn't validate - that's done at API layer with validators
-        // But if we want to test handler with null email, it should still work (validation is API layer concern)
-        _mockCustomerRepo
-            .Setup(x => x.ExistsByEmailAsync(string.Empty))
-            .ReturnsAsync(false);
-
-        _mockCustomerRepo
-            .Setup(x => x.AddAsync(It.IsAny<Customer>()))
-            .ReturnsAsync((Customer c) => { c.Id = 1; return c; });
-
-        var command = new CreateCustomerCommand(request);
-        var result = await handler.HandleAsync(command);
-
-        result.Should().NotBeNull();
-    }
 }
 
 /// <summary>

@@ -182,7 +182,7 @@ public class ChangeOrderStatusValidatorTests
 
         // Assert
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == "NewStatus");
+        result.Errors.Should().Contain(e => e.PropertyName == "Status");
     }
 
     [Fact]
@@ -196,6 +196,6 @@ public class ChangeOrderStatusValidatorTests
 
         // Assert
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == "NewStatus");
+        result.Errors.Should().Contain(e => e.PropertyName == "Status");
     }
 }

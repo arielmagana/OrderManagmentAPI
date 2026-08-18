@@ -1,5 +1,7 @@
 namespace OrderManagement.Application.Products.DTOs;
 
+using System.Text.Json.Serialization;
+
 /// <summary>
 /// Request DTO for updating an existing product.
 /// Per ADR-008 (manual DTO mapping).
@@ -24,7 +26,10 @@ public class UpdateProductRequest
     /// <summary>
     /// Optional: Updated unit price (must be greater than 0 if provided).
     /// </summary>
-    public decimal? Price { get; set; }
+    public decimal? UnitPrice { get; set; }
+
+    [JsonIgnore]
+    public decimal? Price { get => UnitPrice; set => UnitPrice = value; }
 
     /// <summary>
     /// Optional: Updated stock quantity.

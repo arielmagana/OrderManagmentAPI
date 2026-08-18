@@ -21,7 +21,7 @@ public static class ProductMappings
             Sku = request.Sku,
             Name = request.Name,
             Description = request.Description ?? string.Empty,
-            Price = request.Price,
+            Price = request.UnitPrice,
             StockQuantity = request.StockQuantity,
         };
     }
@@ -37,7 +37,7 @@ public static class ProductMappings
             Sku = entity.Sku,
             Name = entity.Name,
             Description = entity.Description,
-            Price = entity.Price,
+            UnitPrice = entity.Price,
             StockQuantity = entity.StockQuantity,
             IsActive = entity.IsActive,
             CreatedAt = entity.CreatedAt,
@@ -60,8 +60,8 @@ public static class ProductMappings
         if (!string.IsNullOrWhiteSpace(request.Description))
             entity.Description = request.Description;
 
-        if (request.Price.HasValue)
-            entity.Price = request.Price.Value;
+        if (request.UnitPrice.HasValue)
+            entity.Price = request.UnitPrice.Value;
 
         if (request.StockQuantity.HasValue)
             entity.StockQuantity = request.StockQuantity.Value;

@@ -21,6 +21,7 @@ public static class OrderMappings
             Id = entity.Id,
             OrderNumber = entity.OrderNumber,
             CustomerId = entity.CustomerId,
+            OrderDate = entity.CreatedAt,
             Status = entity.Status.ToString(),
             TotalAmount = entity.TotalAmount,
             Notes = entity.Notes,
@@ -42,7 +43,7 @@ public static class OrderMappings
             ProductName = entity.Product?.Name ?? string.Empty,
             Quantity = entity.Quantity,
             UnitPrice = entity.UnitPrice,
-            LineTotal = entity.LineTotal,
+            Subtotal = entity.LineTotal,
         };
     }
 }

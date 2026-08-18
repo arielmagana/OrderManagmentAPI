@@ -3,6 +3,9 @@ namespace OrderManagement.Application.Customers;
 using DTOs;
 using Commands;
 using Queries;
+using Validators;
+using Common.Validation;
+using FluentValidation;
 
 /// <summary>
 /// Service interface for customer operations.
@@ -42,21 +45,28 @@ public class CustomerService : ICustomerService
     private readonly UpdateCustomerCommandHandler _updateCommandHandler;
     private readonly GetCustomerQueryHandler _getQueryHandler;
     private readonly GetCustomersPagedQueryHandler _getPagedQueryHandler;
+    private readonly IValidator<CreateCustomerRequest> _createValidator;
+    private readonly IValidator<UpdateCustomerRequest> _updateValidator;
 
     public CustomerService(
         CreateCustomerCommandHandler createCommandHandler,
         UpdateCustomerCommandHandler updateCommandHandler,
         GetCustomerQueryHandler getQueryHandler,
-        GetCustomersPagedQueryHandler getPagedQueryHandler)
+        GetCustomersPagedQueryHandler getPagedQueryHandler,
+        IValidator<CreateCustomerRequest> createValidator,
+        IValidator<UpdateCustomerRequest> updateValidator)
     {
         _createCommandHandler = createCommandHandler;
         _updateCommandHandler = updateCommandHandler;
         _getQueryHandler = getQueryHandler;
         _getPagedQueryHandler = getPagedQueryHandler;
+        _createValidator = createValidator;
+        _updateValidator = updateValidator;
     }
 
     public async Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest request)
     {
+        await RequestValidator.ValidateAsync(_createValidator, request);
         var command = new CreateCustomerCommand(request);
         return await _createCommandHandler.HandleAsync(command);
     }
@@ -69,12 +79,14 @@ public class CustomerService : ICustomerService
 
     public async Task<Common.Pagination.PaginatedResponse<CustomerDto>> GetCustomersPagedAsync(int page = 1, int pageSize = 20)
     {
+        RequestValidator.ValidatePagination(page, pageSize);
         var query = new GetCustomersPagedQuery(page, pageSize);
         return await _getPagedQueryHandler.HandleAsync(query);
     }
 
     public async Task<CustomerDto> UpdateCustomerAsync(int customerId, UpdateCustomerRequest request)
     {
+        await RequestValidator.ValidateAsync(_updateValidator, request);
         var command = new UpdateCustomerCommand(customerId, request);
         return await _updateCommandHandler.HandleAsync(command);
     }

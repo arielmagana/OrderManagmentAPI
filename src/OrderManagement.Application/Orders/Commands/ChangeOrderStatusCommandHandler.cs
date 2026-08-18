@@ -40,17 +40,29 @@ public class ChangeOrderStatusCommandHandler
         }
 
         // Parse new status
-        if (!Enum.TryParse<OrderStatus>(command.Request.NewStatus, ignoreCase: true, out var newStatus))
+        if (!Enum.TryParse<OrderStatus>(command.Request.Status, ignoreCase: true, out var newStatus))
         {
-            throw new InvalidStatusTransitionException(order.Status.ToString(), command.Request.NewStatus);
+            throw new InvalidStatusTransitionException(order.Status.ToString(), command.Request.Status);
         }
 
         // Validate transition is allowed (per ADR-006)
         ValidateStatusTransition(order.Status, newStatus);
 
-        // Update status
-        order.Status = newStatus;
-        order.UpdatedAt = DateTime.UtcNow;
+        // Delegate the mutation to the domain entity so its invariant remains authoritative.
+        switch (newStatus)
+        {
+            case OrderStatus.Confirmed:
+                order.Confirm();
+                break;
+            case OrderStatus.Completed:
+                order.Complete();
+                break;
+            case OrderStatus.Cancelled:
+                order.Cancel();
+                break;
+            default:
+                throw new InvalidStatusTransitionException(order.Status.ToString(), newStatus.ToString());
+        }
 
         // Save to repository
         var updatedOrder = await _orderRepository.UpdateAsync(order);
@@ -65,10 +77,6 @@ public class ChangeOrderStatusCommandHandler
     /// </summary>
     private static void ValidateStatusTransition(OrderStatus currentStatus, OrderStatus newStatus)
     {
-        // If trying to transition to the same status, allow it (idempotent)
-        if (currentStatus == newStatus)
-            return;
-
         var isValid = (currentStatus, newStatus) switch
         {
             // Valid: Pending can go to Confirmed or Cancelled

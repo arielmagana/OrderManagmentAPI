@@ -1,5 +1,7 @@
 namespace OrderManagement.Application.Customers.DTOs;
 
+using System.ComponentModel.DataAnnotations;
+
 /// <summary>
 /// Request DTO for creating a new customer.
 /// Per api.md and ADR-008 (manual DTO mapping).
@@ -9,11 +11,14 @@ public class CreateCustomerRequest
     /// <summary>
     /// The customer's full name (required).
     /// </summary>
+    [Required]
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
     /// The customer's email address (required, must be unique).
     /// </summary>
+    [Required]
+    [EmailAddress]
     public string Email { get; set; } = string.Empty;
 
     /// <summary>

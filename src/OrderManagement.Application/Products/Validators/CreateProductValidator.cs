@@ -23,7 +23,7 @@ public class CreateProductValidator : AbstractValidator<CreateProductRequest>
             .MaximumLength(200)
             .WithMessage("Name must not exceed 200 characters");
 
-        RuleFor(x => x.Price)
+        RuleFor(x => x.UnitPrice)
             .GreaterThan(0)
             .WithMessage("Unit price must be greater than zero");
 

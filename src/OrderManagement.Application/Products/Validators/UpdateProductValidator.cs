@@ -28,9 +28,9 @@ public class UpdateProductValidator : AbstractValidator<UpdateProductRequest>
         });
 
         // Price validation (optional but if provided, must be valid)
-        When(x => x.Price.HasValue, () =>
+        When(x => x.UnitPrice.HasValue, () =>
         {
-            RuleFor(x => x.Price)
+            RuleFor(x => x.UnitPrice)
                 .GreaterThan(0)
                 .WithMessage("Unit price must be greater than zero");
         });

@@ -90,7 +90,7 @@ public class CreateProductValidatorTests
 
         // Assert
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == "Price");
+        result.Errors.Should().Contain(e => e.PropertyName == "UnitPrice");
     }
 
     [Fact]
@@ -109,7 +109,7 @@ public class CreateProductValidatorTests
 
         // Assert
         result.IsValid.Should().BeFalse();
-        result.Errors.Should().Contain(e => e.PropertyName == "Price");
+        result.Errors.Should().Contain(e => e.PropertyName == "UnitPrice");
     }
 
     [Fact]
