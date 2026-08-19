@@ -30,7 +30,14 @@ public class OrderRepository(OrderManagementDbContext dbContext) : IOrderReposit
 
     public async Task<Order> UpdateAsync(Order order)
     {
-        dbContext.Orders.Update(order);
+        if (dbContext.Entry(order).State == EntityState.Detached)
+        {
+            // Attach the graph as unchanged and mark only the aggregate root as modified.
+            // DbSet.Update would recursively mark products and order items as modified.
+            dbContext.Orders.Attach(order);
+            dbContext.Entry(order).State = EntityState.Modified;
+        }
+
         await dbContext.SaveChangesAsync();
         return order;
     }

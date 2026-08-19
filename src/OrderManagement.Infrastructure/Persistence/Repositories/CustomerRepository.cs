@@ -21,7 +21,12 @@ public class CustomerRepository(OrderManagementDbContext dbContext) : ICustomerR
 
     public async Task<Customer> UpdateAsync(Customer customer)
     {
-        dbContext.Customers.Update(customer);
+        if (dbContext.Entry(customer).State == EntityState.Detached)
+        {
+            dbContext.Customers.Attach(customer);
+            dbContext.Entry(customer).State = EntityState.Modified;
+        }
+
         await dbContext.SaveChangesAsync();
         return customer;
     }

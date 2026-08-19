@@ -14,30 +14,38 @@ public sealed class SqlServerCollection : ICollectionFixture<SqlServerFixture>
 public sealed class SqlServerFixture : IAsyncLifetime
 {
     private readonly MsSqlContainer _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-latest").Build();
+    private string _connectionString = string.Empty;
 
-    public async Task InitializeAsync() => await _container.StartAsync();
-
-    public async Task DisposeAsync() => await _container.DisposeAsync();
-
-    public async Task<OrderManagementDbContext> CreateContextAsync()
+    public async Task InitializeAsync()
     {
-        var baseConnectionString = _container.GetConnectionString();
+        await _container.StartAsync();
 
-        var builder = new SqlConnectionStringBuilder(baseConnectionString)
+        var builder = new SqlConnectionStringBuilder(_container.GetConnectionString())
         {
             InitialCatalog = "OrderManagementTestDb"
         };
+        _connectionString = builder.ConnectionString;
 
+        await using var context = CreateContext();
+        await context.Database.MigrateAsync();
+    }
+
+    public async Task DisposeAsync() => await _container.DisposeAsync();
+
+    public OrderManagementDbContext CreateContext()
+    {
         var options = new DbContextOptionsBuilder<OrderManagementDbContext>()
-            .UseSqlServer(builder.ConnectionString)
+            .UseSqlServer(_connectionString)
             .EnableSensitiveDataLogging()
             .Options;
 
-        var context = new OrderManagementDbContext(options);
+        return new OrderManagementDbContext(options);
+    }
 
-        await context.Database.EnsureDeletedAsync();
-        await context.Database.MigrateAsync();
-
-        return context;
+    public async Task ResetDatabaseAsync()
+    {
+        await using var context = CreateContext();
+        await context.Database.ExecuteSqlRawAsync(
+            "DELETE FROM [OrderItems]; DELETE FROM [Orders]; DELETE FROM [Customers]; DELETE FROM [Products];");
     }
 }

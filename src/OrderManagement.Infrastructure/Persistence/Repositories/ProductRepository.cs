@@ -21,7 +21,12 @@ public class ProductRepository(OrderManagementDbContext dbContext) : IProductRep
 
     public async Task<Product> UpdateAsync(Product product)
     {
-        dbContext.Products.Update(product);
+        if (dbContext.Entry(product).State == EntityState.Detached)
+        {
+            dbContext.Products.Attach(product);
+            dbContext.Entry(product).State = EntityState.Modified;
+        }
+
         await dbContext.SaveChangesAsync();
         return product;
     }
