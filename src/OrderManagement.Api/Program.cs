@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.OpenApi;
 using OrderManagement.Api.Errors;
 using OrderManagement.Api.HealthChecks;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +13,20 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddTransient<GlobalExceptionMiddleware>();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddOpenApi("v1", options =>
+{
+    options.AddDocumentTransformer((document, _, _) =>
+    {
+        document.Info = new OpenApiInfo
+        {
+            Title = "Order Management API",
+            Version = "v1",
+            Description = "HTTP API for managing customers, products, and orders. Errors follow ADR-007."
+        };
+
+        return Task.CompletedTask;
+    });
+});
 builder.Services
     .AddControllers()
     .ConfigureApiBehaviorOptions(options =>
@@ -23,6 +39,12 @@ builder.Services
     });
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+    app.MapScalarApiReference(options => options.WithTitle("Order Management API v1"));
+}
 
 // Keep exception handling ahead of all request handlers so every API failure has one contract.
 app.UseMiddleware<GlobalExceptionMiddleware>();
