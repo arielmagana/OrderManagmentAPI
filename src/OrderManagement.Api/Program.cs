@@ -1,5 +1,5 @@
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.OpenApi;
 using OrderManagement.Api.Errors;
 using OrderManagement.Api.HealthChecks;
@@ -50,9 +50,13 @@ if (app.Environment.IsDevelopment())
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
 app.MapControllers();
-app.MapHealthChecks("/api/health", new HealthCheckOptions
+app.MapGet("/api/health", async (HttpContext context, HealthCheckService healthChecks) =>
 {
-    ResponseWriter = HealthCheckResponseWriter.WriteAsync
+    var report = await healthChecks.CheckHealthAsync(context.RequestAborted);
+    context.Response.StatusCode = report.Status == HealthStatus.Unhealthy
+        ? StatusCodes.Status503ServiceUnavailable
+        : StatusCodes.Status200OK;
+    await HealthCheckResponseWriter.WriteAsync(context, report);
 })
     .WithName("GetApiHealth")
     .WithTags("Health")
@@ -66,3 +70,6 @@ app.MapHealthChecks("/api/health", new HealthCheckOptions
 app.MapGet("/", () => "Hello World!");
 
 app.Run();
+
+// WebApplicationFactory needs an accessible entry point for the top-level program.
+public partial class Program;
