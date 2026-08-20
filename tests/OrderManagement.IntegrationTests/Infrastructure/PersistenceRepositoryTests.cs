@@ -35,6 +35,9 @@ public class PersistenceRepositoryTests(SqlServerFixture fixture) : IAsyncLifeti
             (await repository.GetByEmailAsync("first@example.com"))!.Id.Should().Be(firstId);
             (await repository.ExistsByEmailAsync("first@example.com")).Should().BeTrue();
             (await repository.GetAllAsync()).Select(customer => customer.Id).Should().Equal(firstId, secondId);
+            var customerPage = await repository.GetPagedAsync(2, 1);
+            customerPage.TotalCount.Should().Be(2);
+            customerPage.Items.Select(customer => customer.Id).Should().Equal(secondId);
             await repository.DeleteAsync(firstId);
             await repository.DeleteAsync(int.MaxValue);
         }
@@ -67,6 +70,9 @@ public class PersistenceRepositoryTests(SqlServerFixture fixture) : IAsyncLifeti
             (await repository.GetBySkuAsync("SKU-001"))!.Price.Should().Be(15.25m);
             (await repository.ExistsBySkuAsync("SKU-001")).Should().BeTrue();
             (await repository.GetAllAsync()).Select(product => product.Id).Should().Equal(detached.Id, secondId);
+            var productPage = await repository.GetPagedAsync(2, 1);
+            productPage.TotalCount.Should().Be(2);
+            productPage.Items.Select(product => product.Id).Should().Equal(secondId);
             await repository.DeleteAsync(secondId);
             await repository.DeleteAsync(int.MaxValue);
         }

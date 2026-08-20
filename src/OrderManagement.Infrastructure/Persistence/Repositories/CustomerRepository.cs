@@ -10,6 +10,19 @@ public class CustomerRepository(OrderManagementDbContext dbContext) : ICustomerR
 
     public async Task<IEnumerable<Customer>> GetAllAsync() => await dbContext.Customers.OrderBy(customer => customer.Id).ToListAsync();
 
+    public async Task<(IReadOnlyList<Customer> Items, int TotalCount)> GetPagedAsync(int page, int pageSize)
+    {
+        var query = dbContext.Customers.AsNoTracking();
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderBy(customer => customer.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (items, totalCount);
+    }
+
     public Task<Customer?> GetByEmailAsync(string email) => dbContext.Customers.SingleOrDefaultAsync(customer => customer.Email == email);
 
     public async Task<Customer> AddAsync(Customer customer)

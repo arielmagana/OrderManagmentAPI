@@ -10,6 +10,19 @@ public class ProductRepository(OrderManagementDbContext dbContext) : IProductRep
 
     public async Task<IEnumerable<Product>> GetAllAsync() => await dbContext.Products.OrderBy(product => product.Id).ToListAsync();
 
+    public async Task<(IReadOnlyList<Product> Items, int TotalCount)> GetPagedAsync(int page, int pageSize)
+    {
+        var query = dbContext.Products.AsNoTracking();
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderBy(product => product.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (items, totalCount);
+    }
+
     public Task<Product?> GetBySkuAsync(string sku) => dbContext.Products.SingleOrDefaultAsync(product => product.Sku == sku);
 
     public async Task<Product> AddAsync(Product product)

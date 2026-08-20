@@ -21,16 +21,8 @@ public class GetCustomersPagedQueryHandler
 
     public async Task<PaginatedResponse<CustomerDto>> HandleAsync(GetCustomersPagedQuery query)
     {
-        // Retrieve all customers
-        var allCustomers = await _customerRepository.GetAllAsync();
-        var customerList = allCustomers.ToList();
-
-        // Calculate pagination
-        var totalCount = customerList.Count;
-        var itemsToSkip = (query.Page - 1) * query.PageSize;
-        var pagedItems = customerList
-            .Skip(itemsToSkip)
-            .Take(query.PageSize)
+        var (customers, totalCount) = await _customerRepository.GetPagedAsync(query.Page, query.PageSize);
+        var pagedItems = customers
             .Select(CustomerMappings.ToDto)
             .ToList();
 

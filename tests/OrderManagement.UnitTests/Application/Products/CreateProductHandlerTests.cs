@@ -288,8 +288,8 @@ public class GetProductsPagedHandlerTests
         };
 
         _mockProductRepo
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(products);
+            .Setup(x => x.GetPagedAsync(1, 20))
+            .ReturnsAsync((products, products.Length));
 
         var query = new GetProductsPagedQuery(page: 1, pageSize: 20);
         var handler = new GetProductsPagedQueryHandler(_mockProductRepo.Object);

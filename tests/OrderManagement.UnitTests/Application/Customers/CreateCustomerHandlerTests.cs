@@ -310,8 +310,8 @@ public class GetCustomersPagedHandlerTests
         };
 
         _mockCustomerRepo
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(customers);
+            .Setup(x => x.GetPagedAsync(1, 20))
+            .ReturnsAsync((customers, customers.Length));
 
         var query = new GetCustomersPagedQuery(page: 1, pageSize: 20);
         var handler = new GetCustomersPagedQueryHandler(_mockCustomerRepo.Object);
@@ -345,8 +345,8 @@ public class GetCustomersPagedHandlerTests
             .ToArray();
 
         _mockCustomerRepo
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(customers);
+            .Setup(x => x.GetPagedAsync(2, 20))
+            .ReturnsAsync((customers.Skip(20).ToArray(), customers.Length));
 
         var query = new GetCustomersPagedQuery(page: 2, pageSize: 20);
         var handler = new GetCustomersPagedQueryHandler(_mockCustomerRepo.Object);

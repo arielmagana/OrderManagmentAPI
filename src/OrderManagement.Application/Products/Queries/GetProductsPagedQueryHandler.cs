@@ -21,16 +21,8 @@ public class GetProductsPagedQueryHandler
 
     public async Task<PaginatedResponse<ProductDto>> HandleAsync(GetProductsPagedQuery query)
     {
-        // Retrieve all products
-        var allProducts = await _productRepository.GetAllAsync();
-        var productList = allProducts.ToList();
-
-        // Calculate pagination
-        var totalCount = productList.Count;
-        var itemsToSkip = (query.Page - 1) * query.PageSize;
-        var pagedItems = productList
-            .Skip(itemsToSkip)
-            .Take(query.PageSize)
+        var (products, totalCount) = await _productRepository.GetPagedAsync(query.Page, query.PageSize);
+        var pagedItems = products
             .Select(ProductMappings.ToDto)
             .ToList();
 

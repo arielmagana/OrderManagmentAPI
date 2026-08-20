@@ -17,8 +17,8 @@ public sealed class GlobalExceptionMiddleware(ILogger<GlobalExceptionMiddleware>
 
             if (error.Status == StatusCodes.Status500InternalServerError)
             {
-                // Do not include exception messages or request bodies: either can contain customer data.
                 logger.LogError(
+                    exception,
                     "Unhandled {ExceptionType} while processing an HTTP {Method} request; TraceId: {TraceId}",
                     exception.GetType().FullName,
                     context.Request.Method,

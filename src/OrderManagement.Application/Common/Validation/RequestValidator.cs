@@ -9,6 +9,8 @@ using FluentValidation;
 /// </summary>
 public static class RequestValidator
 {
+    private const int MaximumPageSize = 100;
+
     public static async Task ValidateAsync<T>(IValidator<T> validator, T request)
     {
         var validationResult = await validator.ValidateAsync(request);
@@ -46,6 +48,8 @@ public static class RequestValidator
             errors["page"] = ["Page must be greater than or equal to 1"];
         if (pageSize < 1)
             errors["pageSize"] = ["Page size must be greater than or equal to 1"];
+        else if (pageSize > MaximumPageSize)
+            errors["pageSize"] = [$"Page size must be less than or equal to {MaximumPageSize}"];
 
         if (errors.Count > 0)
             throw Exceptions.ValidationException.FromFluentValidationErrors(errors);

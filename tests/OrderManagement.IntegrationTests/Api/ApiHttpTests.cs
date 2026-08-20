@@ -63,6 +63,7 @@ public sealed class ApiHttpTests : IAsyncLifetime
         await AssertErrorAsync(await _client.PostAsync("/api/customers", new StringContent("{ broken", Encoding.UTF8, "application/json")), 400, "INVALID_REQUEST", true);
         await AssertErrorAsync(await _client.PostAsJsonAsync("/api/customers", new { name = new string('x', 101), email = "valid@example.com" }), 422, "VALIDATION_FAILED", expectErrors: true);
         await AssertErrorAsync(await _client.GetAsync("/api/customers?page=0"), 422, "VALIDATION_FAILED", expectErrors: true);
+        await AssertErrorAsync(await _client.GetAsync("/api/customers?pageSize=101"), 422, "VALIDATION_FAILED", expectErrors: true);
     }
 
     [Fact]
@@ -89,6 +90,7 @@ public sealed class ApiHttpTests : IAsyncLifetime
         await AssertErrorAsync(await _client.GetAsync("/api/products/999999"), 404, "PRODUCT_NOT_FOUND");
         await AssertErrorAsync(await _client.PostAsJsonAsync("/api/products", new { sku = "VALID", name = "Valid", unitPrice = 1m, stockQuantity = -1 }), 422, "VALIDATION_FAILED", true);
         await AssertErrorAsync(await _client.GetAsync("/api/products?pageSize=0"), 422, "VALIDATION_FAILED", true);
+        await AssertErrorAsync(await _client.GetAsync("/api/products?pageSize=101"), 422, "VALIDATION_FAILED", true);
     }
 
     [Fact]
@@ -121,6 +123,7 @@ public sealed class ApiHttpTests : IAsyncLifetime
         await AssertErrorAsync(await _client.PostAsJsonAsync("/api/orders", new { customerId = 0, items = Array.Empty<object>() }), 400, "INVALID_REQUEST", true);
         await AssertErrorAsync(await _client.GetAsync("/api/orders?customerId=0"), 422, "INVALID_VALUE", true);
         await AssertErrorAsync(await _client.GetAsync("/api/orders?status=nonsense"), 422, "INVALID_VALUE", true);
+        await AssertErrorAsync(await _client.GetAsync("/api/orders?pageSize=101"), 422, "VALIDATION_FAILED", true);
 
         var (customerId, productId) = await SeedEntitiesAsync(true, true);
         await AssertErrorAsync(await _client.PostAsJsonAsync("/api/orders", new { customerId, items = new[] { new { productId = 999999, quantity = 1 } } }), 404, "PRODUCT_NOT_FOUND");

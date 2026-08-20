@@ -43,6 +43,15 @@ public class Phase2RemediationTests
     }
 
     [Fact]
+    public void ValidatePagination_RejectsPageSizesAboveDocumentedMaximum()
+    {
+        var exception = Assert.Throws<ValidationException>(() => RequestValidator.ValidatePagination(1, 101));
+
+        exception.StatusCode.Should().Be(422);
+        exception.Errors.Should().ContainKey("pageSize");
+    }
+
+    [Fact]
     public void CustomerDto_SerializesOnlyDocumentedFields()
     {
         var json = JsonSerializer.Serialize(new CustomerDto { Id = 1, Name = "Ada", Email = "ada@example.com", IsActive = true, Phone = "555" }, JsonOptions);

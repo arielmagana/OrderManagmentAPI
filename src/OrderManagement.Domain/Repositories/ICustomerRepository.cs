@@ -19,6 +19,11 @@ public interface ICustomerRepository
     Task<IEnumerable<Customer>> GetAllAsync();
 
     /// <summary>
+    /// Retrieves one page of customers and the total number of customers.
+    /// </summary>
+    Task<(IReadOnlyList<Customer> Items, int TotalCount)> GetPagedAsync(int page, int pageSize);
+
+    /// <summary>
     /// Retrieves a customer by email address.
     /// </summary>
     Task<Customer?> GetByEmailAsync(string email);

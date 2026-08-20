@@ -19,6 +19,11 @@ public interface IProductRepository
     Task<IEnumerable<Product>> GetAllAsync();
 
     /// <summary>
+    /// Retrieves one page of products and the total number of products.
+    /// </summary>
+    Task<(IReadOnlyList<Product> Items, int TotalCount)> GetPagedAsync(int page, int pageSize);
+
+    /// <summary>
     /// Retrieves a product by its SKU.
     /// </summary>
     Task<Product?> GetBySkuAsync(string sku);
