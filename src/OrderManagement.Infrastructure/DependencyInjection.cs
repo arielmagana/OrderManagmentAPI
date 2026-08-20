@@ -23,6 +23,8 @@ public static class InfrastructureDependencyInjection
 
         services.AddDbContext<OrderManagementDbContext>(options =>
             options.UseSqlServer(connectionString));
+        services.AddHealthChecks()
+            .AddDbContextCheck<OrderManagementDbContext>("database");
 
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<IProductRepository, ProductRepository>();
