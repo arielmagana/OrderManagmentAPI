@@ -119,7 +119,7 @@ Configuration values are separated from application code.
 
 Examples include:
 ```text
-ConnectionStrings__DefaultConnection
+ConnectionStrings__OrderManagement
 ```
 
 Environment-specific configuration must not be committed to the repository.

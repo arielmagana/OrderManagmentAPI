@@ -11,28 +11,34 @@ Base URL:
 ```
 
 Content type:
+
 ```text
 application/json
 ```
+
 All endpoint paths below are relative to /api
 
 ## 2. Customers
+
 ### GET /customers
 
 Returns a paginated list of customers.
 
 Optional query parameters:
+
 ```text
 page
 pageSize
 ```
 
 Example:
+
 ```http
 GET /api/customers?page=1&pageSize=20
 ```
 
 **Response**
+
 ```http
 200 OK
 ```
@@ -59,6 +65,7 @@ GET /api/customers?page=1&pageSize=20
 Returns a customer by ID.
 
 **Response**
+
 ```http
 200 OK
 ```
@@ -73,6 +80,7 @@ Returns a customer by ID.
 ```
 
 Not found
+
 ```http
 404 Not Found
 ```
@@ -82,6 +90,7 @@ Not found
 Creates a customer.
 
 **Request**
+
 ```json
 {
   "name": "John Smith",
@@ -90,12 +99,14 @@ Creates a customer.
 ```
 
 **Validation**
+
 * Name is required.
 * Email is required.
 * Email must be valid.
 * Email must be unique.
 
 **Response**
+
 ```http
 201 Created
 ```
@@ -112,6 +123,7 @@ Creates a customer.
 **Error Responses**
 
 Duplicate email (409 Conflict):
+
 ```json
 {
   "code": "DUPLICATE_EMAIL",
@@ -120,6 +132,7 @@ Duplicate email (409 Conflict):
 ```
 
 Invalid email format (422 Unprocessable Entity):
+
 ```json
 {
   "code": "INVALID_EMAIL",
@@ -134,6 +147,7 @@ Invalid email format (422 Unprocessable Entity):
 ```
 
 Missing required field (400 Bad Request):
+
 ```json
 {
   "code": "MISSING_REQUIRED_FIELD",
@@ -148,22 +162,26 @@ Missing required field (400 Bad Request):
 ```
 
 ## 3. Products
+
 ### GET /products
 
 Returns a paginated list of products.
 
 Optional query parameters:
+
 ```text
 page
 pageSize
 ```
 
 Example:
+
 ```http
 GET /api/products?page=1&pageSize=20
 ```
 
 **Response**
+
 ```http
 200 OK
 ```
@@ -191,6 +209,7 @@ GET /api/products?page=1&pageSize=20
 Returns a product by ID.
 
 **Response**
+
 ```http
 200 OK
 ```
@@ -210,6 +229,7 @@ Returns a product by ID.
 Creates a product.
 
 **Request**
+
 ```json
 {
   "sku": "PROD-001",
@@ -219,22 +239,26 @@ Creates a product.
 ```
 
 **Validation**
+
 * SKU is required.
 * SKU must be unique.
 * Name is required.
 * UnitPrice must be greater than zero.
 
 **Response**
+
 ```http
 201 Created
 ```
 
 ## 4. Orders
+
 ### GET /orders
 
 Returns a paginated list of orders.
 
 Optional query parameters:
+
 ```text
 customerId
 status
@@ -243,11 +267,13 @@ pageSize
 ```
 
 Example:
+
 ```http
 GET /api/orders?status=Pending&page=1&pageSize=20
 ```
 
 **Response**
+
 ```http
 200 OK
 ```
@@ -269,11 +295,13 @@ GET /api/orders?status=Pending&page=1&pageSize=20
   ]
 }
 ```
+
 ### GET /orders/{id}
 
 Returns an order including its items.
 
 **Response**
+
 ```http
 200 OK
 ```
@@ -301,6 +329,7 @@ Returns an order including its items.
 Creates an order.
 
 **Request**
+
 ```json
 {
   "customerId": 1,
@@ -314,6 +343,7 @@ Creates an order.
 ```
 
 **Validation**
+
 * CustomerId is required.
 * Items array is required and must contain at least one item.
 * Each item must specify productId and quantity.
@@ -334,6 +364,7 @@ The application must:
 1. Persist the order and items atomically.
 
 **Response**
+
 ```http
 201 Created
 ```
@@ -359,6 +390,7 @@ The application must:
 **Error Responses**
 
 Customer not found (404 Not Found):
+
 ```json
 {
   "code": "CUSTOMER_NOT_FOUND",
@@ -367,6 +399,7 @@ Customer not found (404 Not Found):
 ```
 
 Customer inactive (409 Conflict):
+
 ```json
 {
   "code": "CUSTOMER_INACTIVE",
@@ -375,6 +408,7 @@ Customer inactive (409 Conflict):
 ```
 
 Product not found (404 Not Found):
+
 ```json
 {
   "code": "PRODUCT_NOT_FOUND",
@@ -383,6 +417,7 @@ Product not found (404 Not Found):
 ```
 
 Product inactive (409 Conflict):
+
 ```json
 {
   "code": "PRODUCT_INACTIVE",
@@ -391,6 +426,7 @@ Product inactive (409 Conflict):
 ```
 
 Invalid quantity (422 Unprocessable Entity):
+
 ```json
 {
   "code": "INVALID_QUANTITY",
@@ -409,6 +445,7 @@ Invalid quantity (422 Unprocessable Entity):
 Changes the status of an order.
 
 **Request**
+
 ```json
 {
   "status": "Confirmed"
@@ -426,6 +463,7 @@ Confirmed → Completed (Order fulfilled)
 ```
 
 **Response**
+
 ```http
 200 OK
 ```
@@ -451,6 +489,7 @@ Confirmed → Completed (Order fulfilled)
 **Error Responses**
 
 Order not found (404 Not Found):
+
 ```json
 {
   "code": "ORDER_NOT_FOUND",
@@ -459,12 +498,14 @@ Order not found (404 Not Found):
 ```
 
 Invalid status transition (409 Conflict):
+
 ```json
 {
   "code": "INVALID_STATUS_TRANSITION",
   "message": "An order in Completed status cannot be changed to Cancelled"
 }
 ```
+
 ## 5. HTTP Status Codes
 
 The API uses the following status codes:
@@ -484,6 +525,7 @@ The API uses the following status codes:
 The API uses the standard ASP.NET Core problem details format where appropriate.
 
 Example:
+
 ```json
 {
   "type": "https://example.com/problems/validation-error",
@@ -500,18 +542,21 @@ Example:
 ## 7. Pagination
 
 Endpoints returning collections may support:
+
 ```text
 page
 pageSize
 ```
 
 Default:
+
 ```text
 page = 1
 pageSize = 20
 ```
 
 Maximum page size:
+
 ```text
 100
 ```
@@ -522,6 +567,15 @@ The implementation should avoid loading unbounded collections into memory.
 
 The API exposes an OpenAPI document.
 
-Swagger UI is available in the development environment to allow interactive testing of the API.
+Scalar API Reference is available in the development environment to allow interactive testing of the API.
+
+When the API runs in the `Development` environment, the documentation is available at:
+
+* OpenAPI document: `/openapi/v1.json`
+* Scalar API Reference: `/scalar/v1` (or `/scalar`)
+
+The document describes the v1 controller routes, request and response DTOs, paginated
+collection responses, declared HTTP status codes, and the ADR-007 `ApiError` response schema.
+The OpenAPI and Scalar endpoints are not enabled in other environments.
 
 The OpenAPI contract should remain synchronized with the implementation.
