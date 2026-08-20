@@ -1,5 +1,6 @@
 namespace OrderManagement.Infrastructure.Persistence.Repositories;
 
+using Domain;
 using Domain.Entities;
 using Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,30 @@ public class OrderRepository(OrderManagementDbContext dbContext) : IOrderReposit
         .Where(order => order.CustomerId == customerId)
         .OrderBy(order => order.Id)
         .ToListAsync();
+
+    public async Task<(IReadOnlyList<Order> Items, int TotalCount)> GetPagedAsync(
+        int page,
+        int pageSize,
+        int? customerId = null,
+        OrderStatus? status = null)
+    {
+        var query = OrdersWithItems.AsNoTracking();
+
+        if (customerId.HasValue)
+            query = query.Where(order => order.CustomerId == customerId.Value);
+
+        if (status.HasValue)
+            query = query.Where(order => order.Status == status.Value);
+
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderBy(order => order.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (items, totalCount);
+    }
 
     public async Task<Order> AddAsync(Order order)
     {

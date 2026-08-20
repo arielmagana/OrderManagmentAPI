@@ -1,5 +1,6 @@
 namespace OrderManagement.Domain.Repositories;
 
+using Domain;
 using Entities;
 
 /// <summary>
@@ -27,6 +28,16 @@ public interface IOrderRepository
     /// Retrieves all orders for a specific customer.
     /// </summary>
     Task<IEnumerable<Order>> GetByCustomerIdAsync(int customerId);
+
+    /// <summary>
+    /// Retrieves a filtered page of orders and the total number of matching orders.
+    /// Filtering is applied before pagination.
+    /// </summary>
+    Task<(IReadOnlyList<Order> Items, int TotalCount)> GetPagedAsync(
+        int page,
+        int pageSize,
+        int? customerId = null,
+        OrderStatus? status = null);
 
     /// <summary>
     /// Adds a new order to the repository.

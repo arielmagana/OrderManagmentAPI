@@ -6,6 +6,7 @@ using Queries;
 using Validators;
 using Common.Validation;
 using FluentValidation;
+using Domain;
 
 /// <summary>
 /// Service interface for order operations.
@@ -27,7 +28,11 @@ public interface IOrderService
     /// <summary>
     /// Retrieves a paginated list of orders.
     /// </summary>
-    Task<Common.Pagination.PaginatedResponse<OrderDto>> GetOrdersPagedAsync(int page = 1, int pageSize = 20);
+    Task<Common.Pagination.PaginatedResponse<OrderDto>> GetOrdersPagedAsync(
+        int page = 1,
+        int pageSize = 20,
+        int? customerId = null,
+        string? status = null);
 
     /// <summary>
     /// Changes an order's status (per ADR-006 transitions).
@@ -77,10 +82,25 @@ public class OrderService : IOrderService
         return await _getQueryHandler.HandleAsync(query);
     }
 
-    public async Task<Common.Pagination.PaginatedResponse<OrderDto>> GetOrdersPagedAsync(int page = 1, int pageSize = 20)
+    public async Task<Common.Pagination.PaginatedResponse<OrderDto>> GetOrdersPagedAsync(
+        int page = 1,
+        int pageSize = 20,
+        int? customerId = null,
+        string? status = null)
     {
         RequestValidator.ValidatePagination(page, pageSize);
-        var query = new GetOrdersPagedQuery(page, pageSize);
+        if (customerId is <= 0)
+            throw Common.Exceptions.ValidationException.InvalidFieldValue("customerId", "Customer ID must be greater than zero.");
+
+        OrderStatus? parsedStatus = null;
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (!Enum.TryParse<OrderStatus>(status, ignoreCase: true, out var value) || !Enum.IsDefined(value))
+                throw Common.Exceptions.ValidationException.InvalidFieldValue("status", "Status must be Pending, Confirmed, Completed, or Cancelled.");
+            parsedStatus = value;
+        }
+
+        var query = new GetOrdersPagedQuery(page, pageSize, customerId, parsedStatus);
         return await _getPagedQueryHandler.HandleAsync(query);
     }
 

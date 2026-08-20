@@ -637,8 +637,8 @@ public class GetOrdersPagedHandlerTests
         };
 
         _mockOrderRepo
-            .Setup(x => x.GetAllAsync())
-            .ReturnsAsync(orders);
+            .Setup(x => x.GetPagedAsync(1, 20, null, null))
+            .ReturnsAsync((orders, orders.Length));
 
         var query = new GetOrdersPagedQuery(page: 1, pageSize: 20);
         var handler = new GetOrdersPagedQueryHandler(_mockOrderRepo.Object);
