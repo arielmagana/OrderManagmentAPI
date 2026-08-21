@@ -79,7 +79,7 @@ jobs:
         uses: dorny/test-reporter@v3
         with:
           name: .NET test results
-          path: artifacts/test-results/*.trx
+          path: artifacts/test-results/**/*.trx
           reporter: dotnet-trx
           fail-on-error: false
 
