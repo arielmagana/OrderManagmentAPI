@@ -47,7 +47,7 @@ public sealed class AspireOrchestrationTests
 
         await using (var firstRun = await StartAppHostAsync())
         {
-            using var client = firstRun.CreateHttpClient("order-management-api");
+            using var client = firstRun.CreateHttpClient("order-management-api", "http");
             using var timeout = new CancellationTokenSource(StartupTimeout);
 
             (await client.GetAsync("/health", timeout.Token)).StatusCode.Should().Be(HttpStatusCode.OK);
@@ -76,7 +76,7 @@ public sealed class AspireOrchestrationTests
 
         await using (var secondRun = await StartAppHostAsync())
         {
-            using var client = secondRun.CreateHttpClient("order-management-api");
+            using var client = secondRun.CreateHttpClient("order-management-api", "http");
             using var timeout = new CancellationTokenSource(StartupTimeout);
             var readResponse = await client.GetAsync($"/api/customers/{id}", timeout.Token);
             readResponse.StatusCode.Should().Be(HttpStatusCode.OK);

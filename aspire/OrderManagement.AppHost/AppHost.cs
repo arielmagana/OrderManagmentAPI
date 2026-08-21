@@ -8,7 +8,7 @@ var database = sql.AddDatabase("OrderManagement");
 builder.AddProject<Projects.OrderManagement_Api>("order-management-api")
     .WithReference(database)
     .WaitFor(database)
-    .WithHttpHealthCheck("/health")
+    .WithHttpHealthCheck("/health", endpointName: "http")
     .WithUrlForEndpoint("http", _ => new()
     {
         Url = "/scalar/v1",
