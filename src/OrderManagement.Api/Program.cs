@@ -42,6 +42,7 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
+    await app.InitializeOrderManagementDatabaseAsync();
     app.MapOpenApi();
     app.MapScalarApiReference(options => options.WithTitle("Order Management API v1"));
 }
@@ -50,6 +51,7 @@ if (app.Environment.IsDevelopment())
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
 app.MapControllers();
+app.MapDefaultEndpoints();
 app.MapGet("/api/health", async (HttpContext context, HealthCheckService healthChecks) =>
 {
     var report = await healthChecks.CheckHealthAsync(context.RequestAborted);
@@ -70,6 +72,3 @@ app.MapGet("/api/health", async (HttpContext context, HealthCheckService healthC
 app.MapGet("/", () => "Hello World!");
 
 app.Run();
-
-// WebApplicationFactory needs an accessible entry point for the top-level program.
-public partial class Program;
