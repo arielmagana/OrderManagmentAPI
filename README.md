@@ -5,7 +5,9 @@
 An ASP.NET Core order-management API built with Clean Architecture, EF Core, SQL Server, and .NET Aspire.
 
 ## Architecture
+
 ## Technologies
+
 ## Project structure
 
 ## Running locally
@@ -52,12 +54,39 @@ In Development, use the Aspire dashboard links for:
 - Readiness and liveness: `/health` and `/alive`
 
 ## CI/CD
+
+GitHub Actions validates every pull request targeting `main`, every push to
+`main`, and optional manual runs. The validation workflow restores and builds
+the solution in Release mode with warnings treated as errors, runs the unit
+suite, runs the SQL Server Testcontainers and Aspire orchestration tests, and
+publishes the API.
+
+The workflow stores TRX test results, Cobertura coverage reports, and the
+published API in the run's **Artifacts** section. Coverage is provided for
+inspection and is not used as a percentage gate. The GitHub-hosted runner must
+provide Docker; unavailable containers fail validation rather than skipping
+integration tests.
+
 ## Azure deployment
+
+`Deployment Preparation (Placeholder)` is a manually triggered demonstration
+workflow. With deployment disabled (the default), it validates the solution and
+creates a deployable API artifact without contacting Azure. Enabling deployment
+currently stops at an intentional guard because no cloud environment exists.
+
+Phase 7 will replace the guard with Azure OIDC authentication, controlled
+database migration, App Service deployment, and a health check. Cloud settings
+and credentials will be supplied through GitHub Environments, environment or
+repository variables, and GitHub secrets; they must never be written into the
+workflow or committed configuration.
+
 ## Architecture decisions
+
 ## Future improvements
-* Authentication
-* Authorization
-* Inventory
-* Payments
-* Asynchronous messaging
-* Distributed architecture
+
+- Authentication
+- Authorization
+- Inventory
+- Payments
+- Asynchronous messaging
+- Distributed architecture

@@ -1,0 +1,91 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validation:
+    name: Build, test, and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Restore dependencies
+        run: dotnet restore OrderManagement.sln
+
+      - name: Build solution
+        run: dotnet build OrderManagement.sln --configuration Release --no-restore -p:TreatWarningsAsErrors=true
+
+      - name: Run unit tests
+        run: >-
+          dotnet test tests/OrderManagement.UnitTests/OrderManagement.UnitTests.csproj
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=unit-tests.trx"
+          --results-directory artifacts/test-results/unit
+          --collect "XPlat Code Coverage"
+
+      - name: Run integration and Aspire orchestration tests
+        timeout-minutes: 15
+        run: >-
+          dotnet test tests/OrderManagement.IntegrationTests/OrderManagement.IntegrationTests.csproj
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=integration-tests.trx"
+          --results-directory artifacts/test-results/integration
+          --collect "XPlat Code Coverage"
+
+      - name: Publish API
+        run: >-
+          dotnet publish src/OrderManagement.Api/OrderManagement.Api.csproj
+          --configuration Release
+          --no-build
+          --output artifacts/publish/api
+
+      - name: Upload test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: artifacts/test-results/**/*.trx
+          if-no-files-found: warn
+
+      - name: Upload coverage reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: artifacts/test-results/**/coverage.cobertura.xml
+          if-no-files-found: warn
+
+      - name: Upload published API
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: order-management-api
+          path: artifacts/publish/api
+          if-no-files-found: error
+

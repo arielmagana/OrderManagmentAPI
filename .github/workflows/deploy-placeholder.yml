@@ -1,0 +1,94 @@
+name: Deployment Preparation (Placeholder)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment for a future deployment
+        required: true
+        type: choice
+        default: development
+        options:
+          - development
+          - staging
+          - production
+      enable_deployment:
+        description: Enable the intentionally blocked cloud deployment job
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployment-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Validate and prepare artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: '**/*.csproj'
+
+      - name: Restore dependencies
+        run: dotnet restore OrderManagement.sln
+
+      - name: Build solution
+        run: dotnet build OrderManagement.sln --configuration Release --no-restore -p:TreatWarningsAsErrors=true
+
+      - name: Run unit tests
+        run: dotnet test tests/OrderManagement.UnitTests/OrderManagement.UnitTests.csproj --configuration Release --no-build
+
+      - name: Run integration and Aspire orchestration tests
+        timeout-minutes: 15
+        run: dotnet test tests/OrderManagement.IntegrationTests/OrderManagement.IntegrationTests.csproj --configuration Release --no-build
+
+      - name: Publish API
+        run: >-
+          dotnet publish src/OrderManagement.Api/OrderManagement.Api.csproj
+          --configuration Release
+          --no-build
+          --output artifacts/publish/api
+
+      - name: Upload deployment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: order-management-api-${{ inputs.environment }}
+          path: artifacts/publish/api
+          if-no-files-found: error
+
+  deploy:
+    name: Cloud deployment placeholder
+    if: ${{ inputs.enable_deployment }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Block deployment until cloud infrastructure is configured
+        shell: bash
+        run: |
+          echo "Cloud deployment is intentionally disabled during Phase 6."
+          echo "Complete Phase 7 cloud, migration, GitHub Environment, and OIDC configuration before enabling it."
+          exit 1
+
+      # Future Phase 7 stages, in execution order:
+      # 1. Authenticate to Azure with GitHub OIDC. Store identifiers in GitHub
+      #    Environment secrets/variables and grant id-token: write only then.
+      # 2. Download the validated order-management-api artifact.
+      # 3. Apply the approved database migration strategy.
+      # 4. Deploy the API artifact to Azure App Service.
+      # 5. Verify the externally configured health endpoint.
+      # 6. Retain the previous artifact as the rollback candidate.
