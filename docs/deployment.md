@@ -34,7 +34,7 @@ cd OrderManagement
 
 Run the Aspire AppHost:
 ```bash
-dotnet run --project src/OrderManagement.AppHost
+dotnet run --project aspire/OrderManagement.AppHost
 ```
 
 The Aspire dashboard provides access to:
@@ -53,7 +53,9 @@ The database schema is managed using Entity Framework Core migrations.
 
 Apply migrations using the configured development process.
 
-The application should be able to initialize a new local database without requiring a manually installed SQL Server instance.
+The AppHost provisions SQL Server with an Aspire-managed persistent volume and injects the generated `OrderManagement` connection string into the API. During Development startup, the API applies pending EF Core migrations before accepting requests, so a new local database requires no manual SQL Server installation or `dotnet ef` command.
+
+Aspire assigns dashboard and API ports dynamically. Open the API, Scalar, OpenAPI, and health links from the dashboard instead of relying on fixed localhost ports.
 
 # 4. CI/CD
 
@@ -161,12 +163,11 @@ Expected response when healthy:
 
 ```json
 {
-  "status": "Healthy",
-  "checks": {
-    "Database": {
-      "status": "Healthy"
-    }
-  }
+  "status": "healthy",
+  "checks": [
+    { "name": "database", "status": "healthy" },
+    { "name": "self", "status": "healthy" }
+  ]
 }
 ```
 
@@ -192,7 +193,7 @@ The health check verifies:
 - SQL Server resource
 - Resource orchestration status
 
-Health status is visible in the Aspire dashboard at `http://localhost:15000` (or similar port).
+Health status is visible in the Aspire dashboard URL printed by AppHost at startup.
 
 ### Production Deployment
 
