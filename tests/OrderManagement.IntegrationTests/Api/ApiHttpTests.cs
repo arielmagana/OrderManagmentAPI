@@ -41,6 +41,18 @@ public sealed class ApiHttpTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Operational_health_endpoints_are_available_in_production()
+    {
+        await using var productionFactory = _factory.WithWebHostBuilder(builder =>
+            builder.UseEnvironment("Production"));
+        using var client = productionFactory.CreateClient();
+
+        (await client.GetAsync("/alive")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await client.GetAsync("/health")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await client.GetAsync("/api/health")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
     public async Task Customers_support_create_lookup_list_and_pagination()
     {
         var first = await PostAsync("/api/customers", new { name = "Ada", email = "ada@example.com" }, HttpStatusCode.Created);

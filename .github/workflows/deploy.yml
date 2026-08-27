@@ -1,0 +1,168 @@
+name: Deploy validated release
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Configured GitHub Environment to deploy
+        required: true
+        type: choice
+        default: staging
+        options:
+          - development
+          - staging
+          - production
+      validation_run_id:
+        description: Successful Continuous Integration workflow run ID for the main branch
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: deployment-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  validate-release:
+    name: Validate immutable release artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Download release from validated run
+        uses: actions/download-artifact@v6
+        with:
+          name: order-management-release
+          path: artifacts
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.validation_run_id }}
+
+      - name: Verify source run, metadata, and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATION_RUN_ID: ${{ inputs.validation_run_id }}
+        shell: bash
+        run: |
+          [[ "$VALIDATION_RUN_ID" =~ ^[0-9]+$ ]]
+          run_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${VALIDATION_RUN_ID}")"
+          test "$(jq -r .name <<< "$run_json")" = "Continuous Integration"
+          test "$(jq -r .head_branch <<< "$run_json")" = "main"
+          test "$(jq -r .conclusion <<< "$run_json")" = "success"
+          test "$(sed -n 's/^commit_sha=//p' artifacts/release-metadata.txt)" = "$(jq -r .head_sha <<< "$run_json")"
+          (cd artifacts && sha256sum --check migration-bundle.sha256)
+          (cd artifacts && sha256sum --check api-files.sha256)
+
+      - name: Stage verified release
+        uses: actions/upload-artifact@v6
+        with:
+          name: verified-release-${{ inputs.environment }}-${{ inputs.validation_run_id }}
+          path: artifacts
+          if-no-files-found: error
+          retention-days: 30
+
+  migrate:
+    name: Apply approved database migrations
+    needs: validate-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+
+    steps:
+      - name: Download verified release
+        uses: actions/download-artifact@v6
+        with:
+          name: verified-release-${{ inputs.environment }}-${{ inputs.validation_run_id }}
+          path: artifacts
+
+      - name: Authenticate to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Record pre-deployment recovery requirement
+        env:
+          AZURE_SQL_RECOVERY_POLICY: ${{ vars.AZURE_SQL_RECOVERY_POLICY }}
+        shell: bash
+        run: |
+          test -n "$AZURE_SQL_RECOVERY_POLICY"
+          echo "Azure SQL recovery policy: ${AZURE_SQL_RECOVERY_POLICY}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply migration bundle
+        env:
+          MIGRATION_CONNECTION_STRING: ${{ secrets.MIGRATION_CONNECTION_STRING }}
+        shell: bash
+        run: |
+          chmod +x artifacts/migrations/efbundle
+          artifacts/migrations/efbundle --connection "$MIGRATION_CONNECTION_STRING"
+
+      - name: Record migration evidence
+        shell: bash
+        run: cat artifacts/release-metadata.txt >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy API and verify health
+    needs: migrate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+
+    steps:
+      - name: Download verified release
+        uses: actions/download-artifact@v6
+        with:
+          name: verified-release-${{ inputs.environment }}-${{ inputs.validation_run_id }}
+          path: artifacts
+
+      - name: Authenticate to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy API artifact
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          package: artifacts/api
+
+      - name: Verify HTTPS operational endpoints
+        env:
+          HEALTH_BASE_URL: ${{ vars.HEALTH_BASE_URL }}
+        shell: bash
+        run: |
+          for path in /alive /health /api/health; do
+            succeeded=false
+            for attempt in {1..12}; do
+              if curl --fail --silent --show-error --max-time 15 "${HEALTH_BASE_URL}${path}" > /dev/null; then
+                succeeded=true
+                break
+              fi
+              sleep 10
+            done
+            test "$succeeded" = true
+          done
+
+      - name: Record deployment evidence
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          VALIDATION_RUN_ID: ${{ inputs.validation_run_id }}
+        shell: bash
+        run: |
+          cat artifacts/release-metadata.txt >> "$GITHUB_STEP_SUMMARY"
+          echo "environment=${TARGET_ENVIRONMENT}" >> "$GITHUB_STEP_SUMMARY"
+          echo "validation_run_id=${VALIDATION_RUN_ID}" >> "$GITHUB_STEP_SUMMARY"
+          echo "health_verification=passed" >> "$GITHUB_STEP_SUMMARY"

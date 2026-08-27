@@ -42,6 +42,8 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
+    // Local Aspire owns developer convenience. Deployment automation owns all
+    // staging and production schema changes before the API receives traffic.
     await app.InitializeOrderManagementDatabaseAsync();
     app.MapOpenApi();
     app.MapScalarApiReference(options => options.WithTitle("Order Management API v1"));

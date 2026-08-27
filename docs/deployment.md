@@ -1,238 +1,131 @@
-# Deployment
+# Deployment and Database Operations
 
-## 1. Overview
+## 1. Deployment model
 
-The Order Management API supports local development through .NET Aspire and cloud deployment to Microsoft Azure.
+The Order Management API targets Azure App Service and Azure SQL Database. Local development remains orchestrated by .NET Aspire.
 
-The initial cloud architecture uses:
+Production releases promote one immutable artifact created by the `Continuous Integration` workflow. That artifact contains the published API, a self-contained Linux x64 EF Core migration bundle, SHA-256 checksums, the source commit, and the expected migration range. The deployment workflow never rebuilds it.
 
-- Azure App Service
-- Azure SQL Database
-- GitHub Actions
-
-# 2. Local Development
-
-## Prerequisites
-
-The following tools are required:
-
-- .NET SDK
-- Docker Desktop
-- Git
-- GitHub account
-
-.NET Aspire requires the appropriate .NET SDK and local container runtime.
-
-## Running Locally
-
-Clone the repository:
-
-```bash
-git clone <repository-url>
-cd OrderManagement
+```text
+CI on main -> API + migration release artifact -> environment approval
+           -> migrate Azure SQL -> deploy App Service -> verify health
 ```
 
-Run the Aspire AppHost:
+Database migration is deliberately separate from API startup. `Development` startup applies pending migrations for Aspire convenience; Staging and Production do not.
+
+## 2. Local development
+
+Prerequisites are .NET 10, Docker Desktop (or another compatible container runtime), Git, and trusted development HTTPS certificates.
+
 ```bash
 dotnet run --project aspire/OrderManagement.AppHost
 ```
 
-The Aspire dashboard provides access to:
+Aspire provisions persistent SQL Server, injects `ConnectionStrings__OrderManagement`, applies migrations during Development startup, and exposes API, documentation, telemetry, and health links through the dashboard.
 
-- API
-- SQL Server
-- Logs
-- Resource health
-- Application telemetry
+## 3. Migration lifecycle
 
-# 3. Local Database
+The authoritative inventory and compatibility policy are in [migrations.md](./migrations.md).
 
-SQL Server runs as a container during local development.
+Create and test a migration with:
 
-The database schema is managed using Entity Framework Core migrations.
-
-Apply migrations using the configured development process.
-
-The AppHost provisions SQL Server with an Aspire-managed persistent volume and injects the generated `OrderManagement` connection string into the API. During Development startup, the API applies pending EF Core migrations before accepting requests, so a new local database requires no manual SQL Server installation or `dotnet ef` command.
-
-Aspire assigns dashboard and API ports dynamically. Open the API, Scalar, OpenAPI, and health links from the dashboard instead of relying on fixed localhost ports.
-
-# 4. CI/CD
-
-GitHub Actions automates the build and validation process.
-
-The pipeline performs:
-```mermaid
-flowchart LR
-    PR["Pull Request"]
-    BUILD["Build"]
-    UNIT["Unit Tests"]
-    INTEGRATION["Integration Tests"]
-    REVIEW["Code Review"]
-    MAIN["main"]
-    DEPLOY["Deploy"]
-    AZURE["Azure App Service"]
-
-    PR --> BUILD
-    BUILD --> UNIT
-    UNIT --> INTEGRATION
-    INTEGRATION --> REVIEW
-    REVIEW --> MAIN
-    MAIN --> DEPLOY
-    DEPLOY --> AZURE
+```bash
+dotnet tool restore
+dotnet ef migrations add MigrationName --project src/OrderManagement.Infrastructure --startup-project src/OrderManagement.Api
+dotnet test tests/OrderManagement.IntegrationTests/OrderManagement.IntegrationTests.csproj --configuration Release
 ```
 
-Pull requests run the validation stages.
+Commit the migration, model snapshot, and manifest update together. CI verifies the migrations against SQL Server and creates the bundle from the same Release build as the API.
 
-Deployments are performed from the main branch after successful validation.
+Production migration rules:
 
-# 5. Azure Architecture
+- Prefer additive, backward-compatible expand/contract changes.
+- Separate long data backfills from schema changes.
+- Review table size, locks, indexes, and expected execution time.
+- Use a dedicated migration credential with schema-change permission.
+- Give the runtime API identity only its required data permissions.
+- Never run automatic EF `Down` migrations in the deployment workflow.
 
-The initial cloud deployment consists of:
-```mermaid
-flowchart TB
-    CLIENT["API Consumer"]
-    APP["Azure App Service<br/>.NET API"]
-    DB["Azure SQL Database"]
+The bundle uses `__EFMigrationsHistory`, so rerunning a successful migration is idempotent. Environment deployment concurrency prevents two workflow runs from migrating the same target simultaneously.
 
-    CLIENT -->|HTTPS| APP
-    APP -->|SQL over TLS| DB
-```
+## 4. Seeding policy
 
-# 6. Azure App Service
+There is no required production reference data, so Phase 7 intentionally provides no production seed operation. Customers, products, and orders are user-owned business data and must never be inserted or reset during deployment.
 
-The ASP.NET Core API is hosted in Azure App Service.
+Integration fixtures stay in the test project. If non-production demo data is added later, it must be an explicit opt-in command, reject Production, use stable business keys, and be safe to rerun without duplicates.
 
-Application configuration is provided through App Service configuration settings.
+## 5. Azure and GitHub prerequisites
 
-The application must not contain production connection strings or secrets in source control.
+Create the Azure App Service and Azure SQL Database described by ADR-004. Configure App Service with:
 
-# 7. Azure SQL Database
+- .NET 10 runtime
+- HTTPS-only access
+- `ConnectionStrings__OrderManagement` as an App Service setting or Key Vault reference
+- App Service Health Check path `/api/health`
+- a runtime database identity/credential that cannot alter schema
 
-Azure SQL Database hosts the production database.
+Create GitHub Environments named `development`, `staging`, and `production` as needed. Production must require reviewer approval. Configure these environment variables:
 
-Database migrations must be applied in a controlled deployment process.
+| Name | Purpose |
+| --- | --- |
+| `AZURE_CLIENT_ID` | Federated application or managed identity client ID |
+| `AZURE_TENANT_ID` | Microsoft Entra tenant ID |
+| `AZURE_SUBSCRIPTION_ID` | Target Azure subscription |
+| `AZURE_WEBAPP_NAME` | App Service application name |
+| `HEALTH_BASE_URL` | HTTPS origin without a trailing slash |
+| `AZURE_SQL_RECOVERY_POLICY` | Short operator-visible description of backup/PITR readiness |
 
-The application uses a dedicated database connection string provided through Azure configuration.
+Configure one environment secret:
 
-# 8. Configuration
+| Name | Purpose |
+| --- | --- |
+| `MIGRATION_CONNECTION_STRING` | Azure SQL connection for the short-lived migration job |
 
-Configuration values are separated from application code.
+The secret is a pragmatic GitHub-hosted runner option. Where network and identity design permit it, replace it with passwordless Azure-hosted execution and managed identity. Never expose production values in repository files, workflow inputs, logs, or artifacts.
 
-Examples include:
-```text
-ConnectionStrings__OrderManagement
-```
+Configure GitHub OIDC federation for the repository/environment subject and grant only the Azure roles required to deploy the named App Service. The workflow grants `id-token: write` only to jobs that authenticate to Azure.
 
-Environment-specific configuration must not be committed to the repository.
+## 6. Release procedure
 
-# 9. Secrets
+1. Merge the reviewed change to `main`.
+2. Wait for `Continuous Integration` to succeed and note its workflow run ID.
+3. Confirm the release artifact contains the intended commit and migration ID in `release-metadata.txt`.
+4. Confirm Azure SQL automated backups/PITR retention and the recovery owner for the target environment.
+5. Dispatch `Deploy validated release` with the target GitHub Environment and successful CI run ID.
+6. Approve the protected environment after reviewing the commit, migration manifest, compatibility notes, and recovery readiness.
+7. The workflow verifies the source run is a successful `main` CI run and validates all checksums.
+8. The migration job authenticates through OIDC and executes the approved bundle once.
+9. The deployment job promotes the matching API artifact to App Service.
+10. The workflow polls `/alive`, `/health`, and `/api/health` over HTTPS and records release evidence in its job summary.
+11. Perform a non-destructive operator smoke test: read an existing record or create uniquely named test data only when an approved cleanup path exists.
 
-Secrets must never be committed to Git. If available, enable Secret Push Protection
+Do not rerun a failed deployment blindly. Identify whether failure occurred before migration, after migration but before application deployment, or during health verification, then use the recovery table below.
 
-For the demonstration environment, Azure App Service configuration may be used for non-complex secrets.
+## 7. Health verification
 
-For a production implementation, Azure Key Vault should be considered.
+| Endpoint | Meaning | Healthy result |
+| --- | --- | --- |
+| `/alive` | Process liveness only | HTTP 200 |
+| `/health` | Internal readiness including database | HTTP 200 |
+| `/api/health` | Public JSON health contract including `self` and `database` checks | HTTP 200 and `status: healthy` |
 
-# 10. Deployment Process
+The operational endpoints disclose only standard health status. Do not add exception details, connection information, or credentials to their responses.
 
-The deployment process is:
+## 8. Failure and rollback runbook
 
-1. Developer creates a pull request.
-1. GitHub Actions builds the solution.
-1. Unit tests are executed.
-1. Integration tests are executed.
-1. Pull request is reviewed.
-1. Changes are merged into main.
-1. GitHub Actions publishes the application.
-1. Application is deployed to Azure App Service.
-1. Database migrations are applied using the defined deployment strategy.
-1. Application health is verified.
+| Failure point | Action |
+| --- | --- |
+| Artifact or checksum validation | Stop. Do not migrate or deploy. Correct the selected CI run ID or produce a new validated release. |
+| Migration before any schema change | Stop and retain logs. Correct connectivity/permission/configuration, then rerun after review. |
+| Migration after partial schema work | Do not run `Down`. Inspect `__EFMigrationsHistory` and database state; engage the database owner before retry or restore. |
+| App deployment after successful compatible migration | Redeploy the previously successful API artifact. Leave additive schema in place. |
+| Health verification | Stop promotion, inspect App Service and database telemetry, and redeploy the previous API artifact if the new version is responsible. |
+| Destructive/incompatible database failure | Stop writes, follow Azure SQL point-in-time restore into a new database, validate it, repoint configuration under operator approval, and preserve the failed database for investigation. |
 
-## 11. Health Check
+Rollback is complete only when the selected prior API artifact is running, all three health endpoints pass, a read-only business smoke test succeeds, and the incident record contains the deployed commit, migration state, timestamps, and operator.
 
-The application exposes a health check endpoint at:
-```http
-GET /api/health
-```
+For production, record the last successful workflow run ID and artifact retention location after every release. A production migration that cannot coexist with the previous API requires a maintenance window, rehearsed restore, and explicit approval before execution.
 
-Expected response when healthy:
-```http
-200 OK
-```
+## 9. Current readiness boundary
 
-```json
-{
-  "status": "healthy",
-  "checks": [
-    { "name": "database", "status": "healthy" },
-    { "name": "self", "status": "healthy" }
-  ]
-}
-```
-
-### Health Check Implementation
-
-The health check endpoint is implemented using .NET's built-in `HealthChecks` middleware.
-
-Configuration:
-- The `Microsoft.Extensions.Diagnostics.HealthChecks` package provides the health check infrastructure
-- .NET Aspire includes built-in health checks for SQL Server connectivity
-- The AppHost (AppHost.cs) configures health checks for the API service and SQL Server resource
-
-### Checked Dependencies
-
-The health check verifies:
-- **Database connectivity**: Whether the SQL Server database is reachable and responsive
-- **Application startup**: Whether the application has completed startup successfully
-
-### Local Development with Aspire
-
-.NET Aspire automatically provides health checks for:
-- The Order Management API
-- SQL Server resource
-- Resource orchestration status
-
-Health status is visible in the Aspire dashboard URL printed by AppHost at startup.
-
-### Production Deployment
-
-In Azure App Service:
-- The health endpoint is used by Azure load balancers to verify application health
-- Azure monitors the `/api/health` endpoint to determine if the instance should receive traffic
-- Failed health checks trigger automated recovery actions (restart, replacement)
-
-### Extensibility
-
-Additional health checks can be added in the future:
-- External API dependencies (payment processors, shipping providers)
-- Cache health (if Redis is introduced)
-- File storage health (if blob storage is added)
-
-Currently, only database connectivity is checked to keep the scope aligned with the project goals.
-
-# 12. Rollback
-
-Application deployments should be recoverable through the previous deployment artifact.
-
-Database changes must be designed carefully because database rollback may not always be safely reversible.
-
-For this demonstration project, rollback procedures are intentionally simplified.
-
-# 13. Production Considerations
-
-The demonstration environment intentionally uses a small Azure footprint.
-
-A production deployment could introduce:
-
-* Azure Key Vault
-* Managed Identity
-* Application Insights
-* Private networking
-* Azure API Management
-* WAF
-* Backup and disaster recovery
-* Deployment slots
-* Infrastructure as Code
-
-These capabilities are outside the current project scope.
+Repository automation, migration policy, checksums, OIDC workflow permissions, operational health endpoints, and recovery instructions are implemented. A real deployment remains intentionally blocked by missing or unverified external state until an operator provisions Azure resources, establishes OIDC federation, configures GitHub Environments, validates database networking, and completes a staging rehearsal.

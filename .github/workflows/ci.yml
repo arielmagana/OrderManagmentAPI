@@ -36,6 +36,9 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore OrderManagement.sln
 
+      - name: Restore pinned .NET tools
+        run: dotnet tool restore
+
       - name: Build solution
         run: dotnet build OrderManagement.sln --configuration Release --no-restore -p:TreatWarningsAsErrors=true
 
@@ -64,6 +67,46 @@ jobs:
           --configuration Release
           --no-build
           --output artifacts/publish/api
+
+      - name: Build migration bundle
+        run: >-
+          dotnet ef migrations bundle
+          --project src/OrderManagement.Infrastructure/OrderManagement.Infrastructure.csproj
+          --startup-project src/OrderManagement.Api/OrderManagement.Api.csproj
+          --configuration Release
+          --no-build
+          --self-contained
+          --target-runtime linux-x64
+          --output artifacts/migrations/efbundle
+
+      - name: Validate migration bundle executable
+        shell: bash
+        run: |
+          chmod +x artifacts/migrations/efbundle
+          artifacts/migrations/efbundle --help > /dev/null
+
+      - name: Create release metadata and checksums
+        shell: bash
+        run: |
+          mkdir -p artifacts/release/api artifacts/release/migrations
+          cp -a artifacts/publish/api/. artifacts/release/api/
+          cp artifacts/migrations/efbundle artifacts/release/migrations/efbundle
+          migration_to="$(find src/OrderManagement.Infrastructure/Persistence/Migrations \
+            -maxdepth 1 -type f -name '[0-9]*_*.cs' ! -name '*.Designer.cs' \
+            -printf '%f\n' | sort | tail -1 | sed 's/\.cs$//')"
+          test -n "$migration_to"
+          grep --fixed-strings --quiet "$migration_to" docs/migrations.md
+          printf '%s\n' \
+            "commit_sha=${GITHUB_SHA}" \
+            "migration_from=database_history" \
+            "migration_to=${migration_to}" \
+            > artifacts/release/release-metadata.txt
+          (cd artifacts/release && sha256sum migrations/efbundle > migration-bundle.sha256)
+          cd artifacts/release
+          find api -type f -print0 \
+            | sort -z \
+            | xargs -0 sha256sum \
+            > api-files.sha256
 
       - name: Upload test results
         if: ${{ always() }}
@@ -97,4 +140,12 @@ jobs:
         with:
           name: order-management-api
           path: artifacts/publish/api
+          if-no-files-found: error
+
+      - name: Upload immutable release
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: order-management-release
+          path: artifacts/release
           if-no-files-found: error
