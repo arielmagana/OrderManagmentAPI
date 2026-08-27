@@ -69,16 +69,15 @@ integration tests.
 
 ## Azure deployment
 
-`Deployment Preparation (Placeholder)` is a manually triggered demonstration
-workflow. With deployment disabled (the default), it validates the solution and
-creates a deployable API artifact without contacting Azure. Enabling deployment
-currently stops at an intentional guard because no cloud environment exists.
+`Deploy validated release` promotes an immutable artifact from a successful
+`main` CI run. It verifies release checksums, authenticates to Azure through
+GitHub OIDC, applies the matching EF Core migration bundle, deploys to App
+Service, and verifies the health endpoints.
 
-Phase 7 will replace the guard with Azure OIDC authentication, controlled
-database migration, App Service deployment, and a health check. Cloud settings
-and credentials will be supplied through GitHub Environments, environment or
-repository variables, and GitHub secrets; they must never be written into the
-workflow or committed configuration.
+Azure resources, OIDC federation, database networking, and GitHub Environment
+values must be configured before the workflow can run. See
+[Deployment and Database Operations](docs/deployment.md) for prerequisites,
+release steps, and recovery procedures.
 
 ## Architecture decisions
 
