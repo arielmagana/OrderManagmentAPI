@@ -81,12 +81,20 @@ jobs:
           name: verified-release-${{ inputs.environment }}-${{ inputs.validation_run_id }}
           path: artifacts
 
-      - name: Authenticate to Azure with OIDC
+      - name: Authenticate migration identity with Azure OIDC
         uses: azure/login@v2
         with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          client-id: ${{ vars.MIGRATION_AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: Verify Azure SQL token acquisition
+        shell: bash
+        run: |
+          az account get-access-token \
+            --resource https://database.windows.net/ \
+            --query expiresOn \
+            --output tsv > /dev/null
 
       - name: Record pre-deployment recovery requirement
         env:
@@ -102,7 +110,8 @@ jobs:
         shell: bash
         run: |
           chmod +x artifacts/migrations/efbundle
-          artifacts/migrations/efbundle --connection "$MIGRATION_CONNECTION_STRING"
+          artifacts/migrations/efbundle \
+            --connection "$MIGRATION_CONNECTION_STRING"
 
       - name: Record migration evidence
         shell: bash

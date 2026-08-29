@@ -54,50 +54,152 @@ There is no required production reference data, so Phase 7 intentionally provide
 
 Integration fixtures stay in the test project. If non-production demo data is added later, it must be an explicit opt-in command, reject Production, use stable business keys, and be safe to rerun without duplicates.
 
-## 5. Azure and GitHub prerequisites
+## 5. Production Identity and Network Configuration
 
-Create the Azure App Service and Azure SQL Database described by ADR-004. Configure App Service with:
+Production uses three independent Microsoft Entra identities:
 
-- .NET 10 runtime
-- HTTPS-only access
-- `ConnectionStrings__OrderManagement` as an App Service setting or Key Vault reference
-- App Service Health Check path `/api/health`
-- a runtime database identity/credential that cannot alter schema
+| Identity | Purpose | Authorization |
+| --- | --- | --- |
+| GitHub deployment identity | Deploy the validated API artifact | `Website Contributor` on the named App Service only |
+| GitHub migration identity | Apply the EF Core migration bundle | Database migration roles only; no Azure RBAC assignment |
+| App Service system-assigned identity | Runtime API database access | Database read/write roles only |
 
-Create GitHub Environments named `development`, `staging`, and `production` as needed. Production must require reviewer approval. Configure these environment variables:
+No identity uses a client secret or SQL password. The two GitHub identities trust the exact GitHub `production` environment subject through separate federated credentials. For repositories using immutable OIDC subjects, the credential must include the owner and repository IDs emitted by GitHub.
 
-| Name | Purpose |
+### 5.1 Azure SQL Firewall
+
+App Service F1 does not support VNet integration. For this demonstration, configure the Azure SQL logical server with public access restricted to selected networks and enable **Allow Azure services and resources to access this server**. Azure represents this exception as:
+
+```text
+Rule: AllowAllWindowsAzureIps
+Start IP: 0.0.0.0
+End IP: 0.0.0.0
+```
+
+Verify it from the virtual `master` database:
+
+```sql
+SELECT name, start_ip_address, end_ip_address
+FROM sys.firewall_rules
+WHERE name = N'AllowAllWindowsAzureIps';
+```
+
+This rule provides network reachability to Azure resources in any subscription; it does not grant database access. Microsoft Entra authentication and contained database roles remain mandatory. Replace this broad exception with private networking after moving to an App Service tier that supports VNet integration.
+
+### 5.2 Migration Identity
+
+Create an Entra application/service principal named `github-order-management-production-migrations` with no client secret and no Azure RBAC assignment. Add a federated credential with:
+
+```text
+Issuer: https://token.actions.githubusercontent.com
+Audience: api://AzureADTokenExchange
+Subject: the exact repository production-environment OIDC subject
+```
+
+Connect to the application database as its Entra administrator and use the migration service principal's object ID:
+
+```sql
+CREATE USER [github-order-management-production-migrations]
+FROM EXTERNAL PROVIDER
+WITH OBJECT_ID = '<migration-service-principal-object-id>';
+
+ALTER ROLE db_ddladmin
+ADD MEMBER [github-order-management-production-migrations];
+
+ALTER ROLE db_datareader
+ADD MEMBER [github-order-management-production-migrations];
+
+ALTER ROLE db_datawriter
+ADD MEMBER [github-order-management-production-migrations];
+```
+
+Do not grant `db_owner`, an App Service role, or subscription/resource-group permissions. The workflow uses `allow-no-subscriptions: true` to establish the Entra session and requests an Azure SQL token before executing the migration bundle.
+
+### 5.3 App Service Runtime Identity
+
+Enable the App Service system-assigned managed identity and obtain its principal ID. Connect to the application database as its Entra administrator:
+
+```sql
+CREATE USER [<app-service-name>]
+FROM EXTERNAL PROVIDER
+WITH OBJECT_ID = '<app-service-principal-id>';
+
+ALTER ROLE db_datareader ADD MEMBER [<app-service-name>];
+ALTER ROLE db_datawriter ADD MEMBER [<app-service-name>];
+```
+
+When executing the script, replace the placeholder but retain the square brackets, for example `[order-management-api]`. Do not grant this identity `db_ddladmin` or `db_owner`.
+
+Configure App Service with the .NET 10 runtime, HTTPS-only access, Health Check path `/api/health`, and this application setting:
+
+```text
+ConnectionStrings__OrderManagement=Server=tcp:<server>.database.windows.net,1433;Initial Catalog=<database>;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Default;
+```
+
+### 5.4 GitHub Production Environment
+
+The `production` environment must require reviewer approval, restrict deployments to `main`, and contain:
+
+| Variable | Purpose |
 | --- | --- |
-| `AZURE_CLIENT_ID` | Federated application or managed identity client ID |
+| `AZURE_CLIENT_ID` | Existing App Service deployment identity client ID |
+| `MIGRATION_AZURE_CLIENT_ID` | Migration-only identity client ID |
 | `AZURE_TENANT_ID` | Microsoft Entra tenant ID |
-| `AZURE_SUBSCRIPTION_ID` | Target Azure subscription |
-| `AZURE_WEBAPP_NAME` | App Service application name |
+| `AZURE_SUBSCRIPTION_ID` | Target subscription used by the deployment identity |
+| `AZURE_WEBAPP_NAME` | App Service name |
 | `HEALTH_BASE_URL` | HTTPS origin without a trailing slash |
-| `AZURE_SQL_RECOVERY_POLICY` | Short operator-visible description of backup/PITR readiness |
+| `AZURE_SQL_RECOVERY_POLICY` | Operator-visible backup/PITR readiness statement |
 
-Configure one environment secret:
+Configure this environment secret:
 
-| Name | Purpose |
+| Secret | Value |
 | --- | --- |
-| `MIGRATION_CONNECTION_STRING` | Azure SQL connection for the short-lived migration job |
+| `MIGRATION_CONNECTION_STRING` | `Server=tcp:<server>.database.windows.net,1433;Initial Catalog=<database>;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;Authentication=Active Directory Default;` |
 
-The secret is a pragmatic GitHub-hosted runner option. Where network and identity design permit it, replace it with passwordless Azure-hosted execution and managed identity. Never expose production values in repository files, workflow inputs, logs, or artifacts.
-
-Configure GitHub OIDC federation for the repository/environment subject and grant only the Azure roles required to deploy the named App Service. The workflow grants `id-token: write` only to jobs that authenticate to Azure.
+The connection string contains no reusable credential but remains an environment secret to avoid exposing environment topology. Never print it or an access token in workflow logs.
 
 ## 6. Release procedure
 
-1. Merge the reviewed change to `main`.
-2. Wait for `Continuous Integration` to succeed and note its workflow run ID.
-3. Confirm the release artifact contains the intended commit and migration ID in `release-metadata.txt`.
-4. Confirm Azure SQL automated backups/PITR retention and the recovery owner for the target environment.
-5. Dispatch `Deploy validated release` with the target GitHub Environment and successful CI run ID.
-6. Approve the protected environment after reviewing the commit, migration manifest, compatibility notes, and recovery readiness.
-7. The workflow verifies the source run is a successful `main` CI run and validates all checksums.
-8. The migration job authenticates through OIDC and executes the approved bundle once.
-9. The deployment job promotes the matching API artifact to App Service.
-10. The workflow polls `/alive`, `/health`, and `/api/health` over HTTPS and records release evidence in its job summary.
-11. Perform a non-destructive operator smoke test: read an existing record or create uniquely named test data only when an approved cleanup path exists.
+1. Verify the deployment, migration, and runtime identities have the roles defined in section 5.
+2. Verify the Azure-services firewall exception and both passwordless connection strings.
+3. Merge the reviewed change to `main`.
+4. Wait for `Continuous Integration` to succeed and note its workflow run ID.
+5. Confirm the release artifact contains the intended commit and migration ID in `release-metadata.txt`.
+6. Confirm Azure SQL automated backups/PITR retention and the recovery owner for the target environment.
+7. Dispatch `Deploy validated release` with `production` and the successful CI run ID.
+8. Approve the protected environment after reviewing the commit, migration manifest, compatibility notes, and recovery readiness.
+9. The workflow verifies the CI source and artifact checksums.
+10. The migration job authenticates as the migration identity, verifies Azure SQL token acquisition, and executes the approved bundle once.
+11. The deployment job authenticates as the deployment identity and promotes the matching API artifact to App Service.
+12. The workflow polls `/alive`, `/health`, and `/api/health` over HTTPS and records release evidence in its job summary.
+13. Perform a non-destructive operator smoke test: read an existing record or create uniquely named test data only when an approved cleanup path exists.
+
+Before the first deployment, capture identity evidence with:
+
+```sql
+SELECT
+    member_principal.name AS principal_name,
+    role_principal.name AS role_name
+FROM sys.database_role_members AS membership
+JOIN sys.database_principals AS role_principal
+    ON role_principal.principal_id = membership.role_principal_id
+JOIN sys.database_principals AS member_principal
+    ON member_principal.principal_id = membership.member_principal_id
+WHERE member_principal.name IN (
+    N'github-order-management-production-migrations',
+    N'<app-service-name>')
+ORDER BY member_principal.name, role_principal.name;
+```
+
+Expected results are `db_ddladmin`, `db_datareader`, and `db_datawriter` for the migration identity, and only `db_datareader` plus `db_datawriter` for the App Service identity. The deployment identity must not appear as a database principal.
+
+After migration, verify:
+
+```sql
+SELECT MigrationId, ProductVersion
+FROM __EFMigrationsHistory
+ORDER BY MigrationId;
+```
 
 Do not rerun a failed deployment blindly. Identify whether failure occurred before migration, after migration but before application deployment, or during health verification, then use the recovery table below.
 
@@ -128,4 +230,4 @@ For production, record the last successful workflow run ID and artifact retentio
 
 ## 9. Current readiness boundary
 
-Repository automation, migration policy, checksums, OIDC workflow permissions, operational health endpoints, and recovery instructions are implemented. A real deployment remains intentionally blocked by missing or unverified external state until an operator provisions Azure resources, establishes OIDC federation, configures GitHub Environments, validates database networking, and completes a staging rehearsal.
+Repository automation, migration policy, checksums, segregated OIDC workflow permissions, operational health endpoints, and recovery instructions are implemented. A real deployment remains intentionally blocked until an operator completes the section 5 configuration and validates it through the first approved production deployment.
