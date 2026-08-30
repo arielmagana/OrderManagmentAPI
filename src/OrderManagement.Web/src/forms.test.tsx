@@ -1,0 +1,2 @@
+import {render,screen,fireEvent} from '@testing-library/react';import {MemoryRouter} from 'react-router-dom';import {describe,it,expect} from 'vitest';import {Customers} from './pages';
+describe('forms',()=>{it('presents accessible client validation',async()=>{render(<MemoryRouter><Customers/></MemoryRouter>);fireEvent.click(screen.getByRole('button',{name:'Create customer'}));expect(await screen.findByRole('alert')).toHaveTextContent('Check the form')})});
