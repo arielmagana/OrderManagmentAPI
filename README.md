@@ -36,6 +36,29 @@ The direct API workflow uses the fallback connection string in `appsettings.Deve
 
 The Aspire SQL data volume survives normal AppHost restarts. To intentionally reset it, stop AppHost, identify the volume attached to the `sql` resource with `docker volume ls`, and remove that specific volume with `docker volume rm <volume-name>`. The next AppHost start creates and migrates a fresh database.
 
+### Frontend
+
+The client in `src/OrderManagement.Web` is a Vite, React, and TypeScript SPA. Copy
+`.env.example` to `.env.local` and set `VITE_API_BASE_URL` to the independently
+hosted API origin (without a trailing slash), then run:
+
+```bash
+cd src/OrderManagement.Web
+npm install
+npm run dev
+```
+
+Run `npm test` for component tests and `npm run build` for the production check.
+The static production output is `src/OrderManagement.Web/dist/`.
+
+To deploy on Azure Static Web Apps Free, use `src/OrderManagement.Web` as the app
+location, `npm run build` as the build command, and `dist` as the output location.
+Configure `VITE_API_BASE_URL` as a build environment variable and allow the Static
+Web Apps origin in the App Service API's CORS settings. The included
+`staticwebapp.config.json` sends client routes to `index.html` while excluding
+assets. It intentionally defines no managed API route because the ASP.NET API is
+deployed separately to Azure App Service.
+
 ## Running tests
 
 ```bash
